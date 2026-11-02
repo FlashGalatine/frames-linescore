@@ -64,7 +64,21 @@ public class CPHInline
                 sb.Append(",\"value\":").Append(Num(TryInt(Var("ls." + key + ".value", "0"), out v) ? Clamp(v, 0, CellMax) : 0));
                 sb.Append(",\"on\":").Append(Var("ls." + key + ".on", "1") != "0" ? "true" : "false").Append('}');
             }
-            sb.Append("]}");
+            sb.Append(']');
+
+            // For the control panel. Themes don't need this.
+            sb.Append(",\"settings\":{\"innings\":").Append(Num(d.Innings));
+            sb.Append(",\"worth\":[");
+            for (int i = 0; i < d.Worth.Length; i++)
+            {
+                if (i > 0) sb.Append(',');
+                sb.Append(Num(d.Worth[i]));
+            }
+            sb.Append("],\"extraWorth\":").Append(Num(d.ExtraWorth));
+            sb.Append(",\"extraOn\":").Append(d.ExtraOn ? "true" : "false");
+            sb.Append(",\"colLabel\":").Append(JsonStr(Var("ls.collabel", "")));
+            sb.Append(",\"extraLabel\":").Append(JsonStr(Var("ls.extralabel", "")));
+            sb.Append("}}");
 
             CPH.WebsocketBroadcastJson(sb.ToString());
             return true;

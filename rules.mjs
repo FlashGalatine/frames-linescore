@@ -102,7 +102,7 @@ function derive(state) {
     }
   }
   const tiedAtCap = over && totals[0] === totals[1] && extraOn && shown === MAX_COLUMNS;
-  return { innings, fixed, worth, extraWorth, cells, cell, totals, shown, over, lead, live, recorded, tiedAtCap };
+  return { innings, fixed, worth, extraWorth, extraOn, cells, cell, totals, shown, over, lead, live, recorded, tiedAtCap };
 }
 
 function columnWorth(d, i) {
@@ -157,6 +157,15 @@ export function buildPayload(state) {
     lead: d.lead,
     over: d.over,
     labels,
+    // For the control panel. Themes don't need this.
+    settings: {
+      innings: d.innings,
+      worth: d.worth,
+      extraWorth: d.extraWorth,
+      extraOn: d.extraOn,
+      colLabel: get(state, 'ls.collabel', ''),
+      extraLabel: get(state, 'ls.extralabel', ''),
+    },
   };
 }
 

@@ -24,8 +24,10 @@
   'use strict';
 
   const q = (() => { try { return new URLSearchParams(location.search); } catch { return new URLSearchParams(''); } })();
-  const WS_URL = window.__SB_WS_URL
-    || (q.get('sbport') ? `ws://127.0.0.1:${q.get('sbport')}/` : 'ws://127.0.0.1:8080/');
+  // Only a real port number reaches the URL, so a query can't point this anywhere else.
+  const sbport = q.get('sbport') || '';
+  const port = /^\d{1,5}$/.test(sbport) && +sbport >= 1 && +sbport <= 65535 ? sbport : '8080';
+  const WS_URL = window.__SB_WS_URL || `ws://127.0.0.1:${port}/`;
   const SYNC_ACTION = (typeof window.__SB_SYNC_ACTION === 'string')
     ? window.__SB_SYNC_ACTION
     : 'Linescore Push';

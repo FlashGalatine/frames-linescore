@@ -81,6 +81,17 @@ async function runCore() {
   return { next, sent, pending: () => q.length, offline: () => offline };
 }
 
+// Which URL the core would dial for a given query, with no real connection made.
+async function coreUrl(search) {
+  const src = await readFile(CORE, 'utf8');
+  let url = null;
+  class FakeSocket { constructor(u) { url = u; } send() {} }
+  const window = { addEventListener() {}, dispatchEvent() {} };
+  const document = { readyState: 'complete', body: { classList: { toggle() {} } }, addEventListener() {} };
+  new Function('window', 'document', 'location', 'WebSocket', 'CustomEvent', 'URLSearchParams', src)(window, document, { search }, FakeSocket, class {}, URLSearchParams);
+  return url;
+}
+
 const cmd = (command, value = '', source = '') =>
   fetch(`${BASE}/mock/cmd?command=${encodeURIComponent(command)}&value=${encodeURIComponent(value)}&source=${encodeURIComponent(source)}`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -120,7 +131,13 @@ async function main() {
     await sleep(150);
     check('scoreboard:update is ignored', a.pending() === before);
 
-    console.log('\n[5] test routes');
+    console.log('\n[5] the port override');
+    for (const [search, want] of [['?sbport=9090', 'ws://127.0.0.1:9090/'], ['?sbport=1@evil.example', 'ws://127.0.0.1:8080/'], ['?sbport=99999', 'ws://127.0.0.1:8080/'], ['', 'ws://127.0.0.1:8080/']]) {
+      const got = await coreUrl(search);
+      check(`${search || 'no query'} connects to ${want}`, got === want, got);
+    }
+
+    console.log('\n[6] test routes');
     const log = await (await fetch(`${BASE}/mock/log`)).json();
     check('/mock/log records commands in order', log.at(-1)?.command === 't1win' && log.at(-1)?.source === 'panel', JSON.stringify(log.slice(-2)));
     const state = await (await fetch(`${BASE}/mock/state`)).json();
@@ -130,7 +147,7 @@ async function main() {
     await sleep(150);
     check('/mock/drop takes panels offline', a.offline() === true);
 
-    console.log('\n[6] serving');
+    console.log('\n[7] serving');
     check('panel-core served 200', (await fetch(`${BASE}/frames-shared/panel-core.js`)).status === 200);
     check('control.html served 200', (await fetch(`${BASE}/frames-shared/control.html`)).status === 200);
     check('the index page lists panels', (await (await fetch(`${BASE}/`)).text()).includes('mock Streamer.bot'));

@@ -40,7 +40,8 @@
   ] },
 
   { "name": "worth-command", "steps": [
-    { "cmd": "worth", "value": "10 10 20 x5", "columns": 3, "live": 0, "expect": { "mode": "fixed", "columns": [{ "worth": 10 }, { "worth": 10 }, { "worth": 20 }] } },
+    { "cmd": "worth", "value": "10 10 20 x5", "columns": 3, "live": 0, "expect": { "mode": "fixed", "columns": [{ "worth": 10 }, { "worth": 10 }, { "worth": 20 }],
+        "settings": { "innings": 3, "worth": [10, 10, 20], "extraWorth": 5, "extraOn": true, "colLabel": "", "extraLabel": "" } } },
     { "cmd": "t1win", "source": "panel" },
     { "cmd": "t1win", "source": "panel" },
     { "cmd": "t2win", "source": "panel", "columns": 4, "expect": { "columns": [{}, {}, {}, { "worth": 5 }] } }
@@ -83,7 +84,7 @@
 
   { "name": "extra-off-draw", "steps": [
     { "cmd": "preset", "value": "sfl" },
-    { "cmd": "extra", "value": "off" },
+    { "cmd": "extra", "value": "off", "expect": { "settings": { "extraOn": false, "colLabel": "SET", "extraLabel": "EXTRA", "innings": 3 } } },
     { "cmd": "t1win", "source": "panel" },
     { "cmd": "t1win", "source": "panel" },
     { "cmd": "t2win", "source": "panel", "columns": 3, "live": null, "expect": { "over": true, "lead": null, "teams": [{ "total": 20 }, { "total": 20 }] } },

@@ -1,1 +1,456 @@
-<!doctype html><meta charset="utf-8"><title>Line score: Control</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Line score: Control</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --bg:#15161a; --card:#1e2027; --line:#2c2f3a; --text:#e8e8ea; --sub:#9aa0ad; --accent:#8b5cf6; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.4 system-ui,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); padding:16px; }
+  h1 { font-size:18px; margin:0 0 2px; }
+  #status { color:var(--sub); font-size:12px; margin:0 0 12px; }
+  #status::before { content:""; display:inline-block; width:9px; height:9px; border-radius:50%; background:#6b7280; margin-right:6px; }
+  #status.on::before { background:#22c55e; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:10px; }
+  .card h2 { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--sub); margin:0 0 8px; }
+  .row { display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap; }
+  .row:last-child { margin-bottom:0; }
+  input { background:#111318; border:1px solid var(--line); color:var(--text); border-radius:7px; padding:7px 8px; font:inherit; min-width:0; }
+  input:focus { outline:none; border-color:var(--accent); }
+  input[type=text] { flex:1; }
+  input[type=number] { width:48px; text-align:center; -moz-appearance:textfield; }
+  input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  label { color:var(--sub); font-size:12px; }
+  button { background:#2a2d38; border:1px solid var(--line); color:var(--text); border-radius:7px; padding:7px 10px; font:inherit; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.big { flex:1; min-width:130px; padding:12px 8px; font-weight:700; background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.danger { border-color:#7f1d1d; }
+  button.armed { background:#7f1d1d; border-color:#b91c1c; color:#fff; }
+  [hidden] { display:none !important; }
+  .hint { color:var(--sub); font-size:12px; margin:8px 0 0; }
+  #grid { display:grid; gap:4px; align-items:center; overflow-x:auto; padding-bottom:4px; }
+  #grid .head { color:var(--sub); font-size:11px; font-weight:700; text-align:center; white-space:nowrap; }
+  #grid .head.live { color:var(--accent); }
+  #grid .name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #grid .total { text-align:center; font-size:16px; font-weight:700; }
+  #grid input { width:100%; padding:7px 2px; }
+  #grid input.live { border-color:var(--accent); }
+  .wide { flex:1; }
+</style>
+</head>
+<body>
+<h1>Line score: Control</h1>
+<p id="status">connecting…</p>
+
+<section class="card">
+  <h2>Teams</h2>
+  <div class="row"><input type="text" id="t1name" data-field="t1name" aria-label="Team 1"><button data-set>Set</button></div>
+  <div class="row"><input type="text" id="t2name" data-field="t2name" aria-label="Team 2"><button data-set>Set</button></div>
+</section>
+
+<section class="card">
+  <h2>Result</h2>
+  <div id="grid"></div>
+  <div class="row" id="winners" style="margin-top:10px">
+    <button class="big" data-win="1"></button>
+    <button class="big" data-win="2"></button>
+  </div>
+  <p class="hint" id="award-hint"></p>
+  <div class="row" style="margin-top:8px">
+    <button id="undo">Undo</button>
+    <button id="next" hidden>Next inning</button>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Format</h2>
+  <div class="row"><button id="mode-fixed">Fixed points</button><button id="mode-free">Free entry</button></div>
+  <div class="row"><label>Innings</label><button id="innings-down" aria-label="Fewer innings">−</button><b id="innings"></b><button id="innings-up" aria-label="More innings">+</button></div>
+  <div class="row" id="worth-row"></div>
+  <div class="row"><button id="extra"></button></div>
+  <div class="row"><button data-preset="sfl">Preset: SFL</button><button data-preset="baseball">Preset: Baseball</button></div>
+</section>
+
+<section class="card">
+  <h2>On the board</h2>
+  <div class="row"><label class="wide">Title</label><input type="text" id="title" data-field="title"></div>
+  <div class="row"><label class="wide">Column prefix</label><input type="text" id="collabel" data-field="collabel"></div>
+  <div class="row"><label class="wide">Extra's label</label><input type="text" id="extralabel" data-field="extralabel"></div>
+  <div class="row"><label class="wide">Total's label</label><input type="text" id="totallabel" data-field="totallabel"></div>
+  <div class="row"><button data-set>Set</button></div>
+</section>
+
+<section class="card">
+  <h2>Counts</h2>
+  <div id="labels"></div>
+  <div class="row"><button data-set>Set names</button></div>
+</section>
+
+<section class="card">
+  <div class="row"><button class="wide danger" id="new-match">New match</button><button class="wide" id="hide">Hide board</button></div>
+</section>
+
+<script>
+// The line score's control panel. A single file: it opens Streamer.bot's WebSocket
+// directly (no library), sends DoAction requests to "Linescore Command", and reflects every
+// "linescore:update" broadcast, so it never fights chat or a Stream Deck.
+//
+// Open it from the HTTP Server (/frames-shared/control.html) or as a local file, in a tab or
+// an OBS Custom Browser Dock. Config: window.__SB_WS_URL or ?sbport=<n>. It only reaches a
+// Streamer.bot on the same machine by default: staff elsewhere use the chat commands.
+(function () {
+  'use strict';
+
+  var q = new URLSearchParams(location.search);
+  // Only a real port number reaches the URL, so a query can't point this anywhere else.
+  var sbport = q.get('sbport') || '';
+  var port = /^\d{1,5}$/.test(sbport) && +sbport >= 1 && +sbport <= 65535 ? sbport : '8080';
+  var WS_URL = window.__SB_WS_URL || 'ws://127.0.0.1:' + port + '/';
+  var CMD_ACTION = 'Linescore Command', SYNC_ACTION = 'Linescore Push';
+  var FLIGHT_MS = 400, MIN_GAP_MS = 120, DOUBLE_CLICK_MS = 400, ARMED_MS = 3000, RECONNECT_MS = 2000, SYNC_FALLBACK_MS = 400;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var ws = null, msgId = 0, S = null;
+
+  // ── The send queue ─────────────────────────────────────────────────────────
+  // Two DoActions to one action within a few ms bleed their arguments together, so only
+  // one command is ever in flight. The next goes when a broadcast comes back, or after
+  // FLIGHT_MS (a rejected command broadcasts nothing), and never under MIN_GAP_MS apart.
+  var queue = [], inFlight = false, lastSend = 0, flightTimer = null;
+
+  function send(command, value, extra) {
+    var args = { command: command, value: value == null ? '' : String(value) };
+    if (extra) Object.keys(extra).forEach(function (k) { args[k] = extra[k]; });
+    queue.push(args);
+    pump();
+  }
+  function pump() {
+    if (inFlight || !queue.length || !ws || ws.readyState !== 1) return;
+    var wait = lastSend + MIN_GAP_MS - Date.now();
+    if (wait > 0) { setTimeout(pump, wait); return; }
+    inFlight = true;
+    lastSend = Date.now();
+    ws.send(JSON.stringify({ request: 'DoAction', id: String(++msgId), action: { name: CMD_ACTION }, args: queue.shift() }));
+    flightTimer = setTimeout(landed, FLIGHT_MS);
+  }
+  function landed() {
+    inFlight = false;
+    clearTimeout(flightTimer);
+    pump();
+  }
+
+  // ── Text fields ────────────────────────────────────────────────────────────
+  // An edited field is dirty until Set, and a broadcast never overwrites it. Any Set sends
+  // every dirty field in one setmany.
+  var dirty = {};
+  document.addEventListener('input', function (e) {
+    var field = e.target.dataset.field;
+    if (field) dirty[field] = true;
+  });
+  function flushFields() {
+    var extra = {}, any = false;
+    document.querySelectorAll('[data-field]').forEach(function (el) {
+      if (dirty[el.dataset.field]) { extra[el.dataset.field] = el.value; any = true; }
+    });
+    if (any) { dirty = {}; send('setmany', '', extra); }
+  }
+  function reflect(el, value) {
+    if (document.activeElement === el) return;
+    if (el.dataset.field && dirty[el.dataset.field]) return;
+    if (el.value !== String(value)) el.value = value;
+  }
+
+  // ── Two-step buttons: clearing scores on air takes a second click ──────────
+  function armed(btn, action) {
+    if (btn.classList.contains('armed')) {
+      clearTimeout(btn._timer);
+      btn.classList.remove('armed');
+      btn.textContent = btn.dataset.text;
+      action();
+      return;
+    }
+    btn.dataset.text = btn.textContent;
+    btn.textContent = 'Click again to clear';
+    btn.classList.add('armed');
+    btn._timer = setTimeout(function () {
+      btn.classList.remove('armed');
+      btn.textContent = btn.dataset.text;
+    }, ARMED_MS);
+  }
+  function hasScores() {
+    return !!S && S.teams.some(function (t) { return t.scores.some(function (v) { return v !== null; }); });
+  }
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+  var lastWin = { team: null, at: 0 };
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.hasAttribute('data-set')) return flushFields();
+    if (btn.dataset.win) {
+      var now = Date.now();
+      if (lastWin.team === btn.dataset.win && now - lastWin.at < DOUBLE_CLICK_MS) return; // a double-click is one result
+      lastWin = { team: btn.dataset.win, at: now };
+      return send('t' + btn.dataset.win + 'win', '', { source: 'panel' });
+    }
+    if (btn.dataset.preset) {
+      var apply = function () { send('preset', btn.dataset.preset); };
+      return hasScores() || btn.classList.contains('armed') ? armed(btn, apply) : apply();
+    }
+    if (btn.dataset.labelToggle) {
+      var label = S && S.labels.filter(function (l) { return l.key === btn.dataset.labelToggle; })[0];
+      return send(btn.dataset.labelToggle, label && label.on ? 'off' : 'on');
+    }
+    switch (btn.id) {
+      case 'undo': return send('undo');
+      case 'next': return send('next');
+      case 'mode-free': return send('free');
+      case 'mode-fixed': return sendWorth();
+      case 'innings-up': return S && send('innings', S.settings.innings + 1);
+      case 'innings-down': return S && send('innings', S.settings.innings - 1);
+      case 'extra': return S && send('extra', S.settings.extraOn ? 'off' : 'on');
+      case 'hide': return S && send(S.hidden ? 'show' : 'hide');
+      case 'new-match':
+        return hasScores() || btn.classList.contains('armed') ? armed(btn, function () { send('reset'); }) : send('reset');
+    }
+  });
+
+  document.addEventListener('change', function (e) {
+    var d = e.target.dataset;
+    if (d.team) return send('t' + d.team, (+d.col + 1) + ' ' + (e.target.value === '' ? '-' : e.target.value));
+    if (d.worth !== undefined) return sendWorth();
+    if (d.labelValue) return send(d.labelValue, e.target.value === '' ? '0' : e.target.value);
+  });
+
+  // The points boxes, as one `worth` command. The list is padded to the innings count, so
+  // switching to fixed points always gives every inning a value.
+  function sendWorth() {
+    if (!S) return;
+    var parts = [];
+    for (var i = 0; i < S.settings.innings; i++) {
+      var box = document.querySelector('[data-worth="' + i + '"]');
+      parts.push(box ? (box.value || '0') : worthOf(i));
+    }
+    var x = document.querySelector('[data-worth="x"]');
+    send('worth', parts.join(' ') + ' x' + (x ? (x.value || '0') : S.settings.extraWorth));
+  }
+  function worthOf(i) {
+    return i < S.settings.worth.length ? S.settings.worth[i] : S.settings.extraWorth;
+  }
+
+  // ── Rendering ──────────────────────────────────────────────────────────────
+  var gridColumns = -1, worthInnings = -1;
+
+  function renderGrid() {
+    var grid = $('grid'), n = S.columns.length;
+    if (n !== gridColumns) {
+      gridColumns = n;
+      grid.textContent = '';
+      grid.style.gridTemplateColumns = 'minmax(72px,1fr) repeat(' + n + ',minmax(38px,44px)) 44px';
+      grid.appendChild(document.createElement('span'));
+      S.columns.forEach(function (c, i) {
+        var h = document.createElement('span');
+        h.className = 'head';
+        h.dataset.head = i;
+        grid.appendChild(h);
+      });
+      var total = document.createElement('span');
+      total.className = 'head';
+      total.id = 'total-head';
+      grid.appendChild(total);
+      [1, 2].forEach(function (t) {
+        var name = document.createElement('span');
+        name.className = 'name';
+        name.dataset.nameOf = t;
+        grid.appendChild(name);
+        S.columns.forEach(function (c, i) {
+          var cell = document.createElement('input');
+          cell.type = 'number';
+          cell.min = '0';
+          cell.max = '99';
+          cell.dataset.team = t;
+          cell.dataset.col = i;
+          grid.appendChild(cell);
+        });
+        var sum = document.createElement('span');
+        sum.className = 'total';
+        sum.dataset.totalOf = t;
+        grid.appendChild(sum);
+      });
+    }
+    S.columns.forEach(function (c, i) {
+      var h = grid.querySelector('[data-head="' + i + '"]');
+      h.textContent = c.label;
+      h.classList.toggle('live', c.state === 'live');
+    });
+    $('total-head').textContent = S.totalLabel;
+    [0, 1].forEach(function (t) {
+      var team = S.teams[t], name = grid.querySelector('[data-name-of="' + (t + 1) + '"]');
+      name.textContent = team.name;
+      name.title = team.name;
+      grid.querySelector('[data-total-of="' + (t + 1) + '"]').textContent = team.total;
+      S.columns.forEach(function (c, i) {
+        var cell = grid.querySelector('input[data-team="' + (t + 1) + '"][data-col="' + i + '"]');
+        reflect(cell, team.scores[i] === null ? '' : team.scores[i]);
+        cell.classList.toggle('live', c.state === 'live');
+      });
+    });
+  }
+
+  function renderAward() {
+    var fixed = S.mode === 'fixed', liveCol = S.columns.filter(function (c) { return c.state === 'live'; })[0];
+    $('winners').hidden = !fixed || !liveCol;
+    $('next').hidden = fixed;
+    document.querySelector('[data-win="1"]').textContent = S.teams[0].name + ' won';
+    document.querySelector('[data-win="2"]').textContent = S.teams[1].name + ' won';
+    var hint = '';
+    if (S.over) {
+      var a = S.teams[0], b = S.teams[1];
+      hint = S.lead === null ? 'Match over: a draw at ' + a.total + '-' + b.total + '.'
+        : 'Match over: ' + (S.lead === 0 ? a.name : b.name) + ' wins ' + Math.max(a.total, b.total) + '-' + Math.min(a.total, b.total) + '.';
+    } else if (fixed && liveCol) {
+      hint = liveCol.label + ' is worth ' + liveCol.worth + '. You can also type over any cell above to correct it.';
+    } else {
+      hint = 'Type any number in any cell. Both teams can score in the same inning.';
+    }
+    $('award-hint').textContent = hint;
+  }
+
+  function renderFormat() {
+    var fixed = S.mode === 'fixed', set = S.settings;
+    $('mode-fixed').classList.toggle('on', fixed);
+    $('mode-free').classList.toggle('on', !fixed);
+    $('innings').textContent = set.innings;
+    $('extra').textContent = 'Ties add an inning: ' + (set.extraOn ? 'on' : 'off');
+    $('extra').classList.toggle('on', set.extraOn);
+    var row = $('worth-row');
+    row.hidden = !fixed;
+    if (fixed && set.innings !== worthInnings) {
+      worthInnings = set.innings;
+      row.textContent = '';
+      var points = document.createElement('label');
+      points.textContent = 'Points';
+      row.appendChild(points);
+      for (var i = 0; i < set.innings; i++) {
+        var box = document.createElement('input');
+        box.type = 'number';
+        box.min = '0';
+        box.dataset.worth = i;
+        box.setAttribute('aria-label', 'Points for inning ' + (i + 1));
+        row.appendChild(box);
+      }
+      var extra = document.createElement('label');
+      extra.textContent = 'Extra';
+      row.appendChild(extra);
+      var xBox = document.createElement('input');
+      xBox.type = 'number';
+      xBox.min = '0';
+      xBox.dataset.worth = 'x';
+      xBox.setAttribute('aria-label', "Extra's points");
+      row.appendChild(xBox);
+    }
+    if (fixed) {
+      for (var k = 0; k < set.innings; k++) reflect(row.querySelector('[data-worth="' + k + '"]'), worthOf(k));
+      reflect(row.querySelector('[data-worth="x"]'), set.extraWorth);
+    }
+  }
+
+  function renderLabels() {
+    var box = $('labels');
+    if (!box.children.length) {
+      S.labels.forEach(function (l) {
+        var row = document.createElement('div');
+        row.className = 'row';
+        var toggle = document.createElement('button');
+        toggle.dataset.labelToggle = l.key;
+        var name = document.createElement('input');
+        name.type = 'text';
+        name.dataset.labelName = l.key;
+        name.dataset.field = l.key + 'name';
+        name.setAttribute('aria-label', l.key + ' label');
+        var value = document.createElement('input');
+        value.type = 'number';
+        value.min = '0';
+        value.dataset.labelValue = l.key;
+        value.setAttribute('aria-label', l.key + ' count');
+        row.appendChild(toggle); row.appendChild(name); row.appendChild(value);
+        box.appendChild(row);
+      });
+    }
+    S.labels.forEach(function (l) {
+      var toggle = box.querySelector('[data-label-toggle="' + l.key + '"]');
+      toggle.textContent = l.on ? 'On' : 'Off';
+      toggle.classList.toggle('on', l.on);
+      reflect(box.querySelector('[data-label-name="' + l.key + '"]'), l.name);
+      reflect(box.querySelector('[data-label-value="' + l.key + '"]'), l.value);
+    });
+  }
+
+  function render() {
+    reflect($('t1name'), S.teams[0].name);
+    reflect($('t2name'), S.teams[1].name);
+    reflect($('title'), S.title);
+    reflect($('collabel'), S.settings.colLabel);
+    reflect($('extralabel'), S.settings.extraLabel);
+    reflect($('totallabel'), S.totalLabel);
+    renderGrid();
+    renderAward();
+    renderFormat();
+    renderLabels();
+    $('hide').textContent = S.hidden ? 'Show board' : 'Hide board';
+  }
+
+  // ── The socket ─────────────────────────────────────────────────────────────
+  function setStatus(on, text) {
+    $('status').classList.toggle('on', on);
+    $('status').textContent = text;
+  }
+
+  function connect() {
+    ws = new WebSocket(WS_URL);
+    var subId = null, synced = false, syncTimer = null;
+    function sync() {
+      if (synced) return;
+      synced = true;
+      clearTimeout(syncTimer);
+      ws.send(JSON.stringify({ request: 'DoAction', id: String(++msgId), action: { name: SYNC_ACTION }, args: { reason: 'panel-connect' } }));
+    }
+    ws.onopen = function () {
+      setStatus(true, 'connected · ' + WS_URL);
+      subId = String(++msgId);
+      // The event-source key is lowercase here, even though events arrive as 'General'.
+      ws.send(JSON.stringify({ request: 'Subscribe', id: subId, events: { general: ['Custom'] } }));
+      syncTimer = setTimeout(sync, SYNC_FALLBACK_MS);
+    };
+    ws.onmessage = function (evt) {
+      var m;
+      try { m = JSON.parse(evt.data); } catch (err) { return; }
+      if (m && m.id && m.id === subId && !m.event) return sync();
+      if (m && m.event && m.event.source === 'General' && m.event.type === 'Custom') {
+        var d = m.data;
+        if (typeof d === 'string') { try { d = JSON.parse(d); } catch (err) { return; } }
+        if (d && d.type === 'linescore:update') {
+          S = d;
+          render();
+          landed();
+        }
+      }
+    };
+    ws.onclose = function () {
+      // Don't replay clicks into a later connection: the operator has moved on by then.
+      queue.length = 0;
+      inFlight = false;
+      clearTimeout(flightTimer);
+      setStatus(false, 'disconnected · retrying…');
+      setTimeout(connect, RECONNECT_MS);
+    };
+  }
+  connect();
+})();
+</script>
+</body>
+</html>
