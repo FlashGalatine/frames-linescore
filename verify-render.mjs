@@ -10,6 +10,7 @@ import { readFile, mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { TOKENS } from './rules.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HTTP_PORT = Number(process.env.SB_HTTP_PORT) || 7476;
@@ -303,6 +304,35 @@ async function verifyTheme(browser) {
   await page.close();
 }
 
+// The docs can't rot quietly: THEMING.md's first example must actually run, and the README
+// must mention every command.
+async function verifyDocs(browser) {
+  console.log('\n[docs]');
+  const theming = await readFile(resolve(__dirname, 'docs/THEMING.md'), 'utf8');
+  const example = /```html\r?\n([\s\S]*?)\r?\n```/.exec(theming);
+  check('THEMING.md has a complete HTML example', !!example);
+  const dir = resolve(__dirname, 'frames-themes/_doc-test');
+  try {
+    await mkdir(dir, { recursive: true });
+    await writeFile(resolve(dir, 'board.html'), example[1], 'utf8');
+    await mockCmd('t1name', 'Doc Team');
+    const page = await browser.newPage({ viewport: { width: 1000, height: 300 } });
+    await page.goto(`${BASE}/frames-themes/_doc-test/board.html?sbport=${WS_PORT}`, { waitUntil: 'load' });
+    const ran = await page.waitForFunction(() => document.getElementById('board')?.textContent.includes('Doc Team'), null, { timeout: 6000 }).then(() => true).catch(() => false);
+    check('the example paints a team name', ran);
+    const total = (await state()).teams[0].total;
+    check('the example paints a total', (await page.locator('#board').textContent()).includes(String(total)));
+    await page.close();
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+  const readme = await readFile(resolve(__dirname, 'README.md'), 'utf8');
+  const missing = TOKENS.filter((t) => !readme.includes('`' + t) && !readme.includes(' ' + t + '`'));
+  check('the README mentions every command', missing.length === 0, missing.join(', '));
+  check('the README says to restrict the chat command', /Moderators/.test(readme));
+  check('the README covers keeping the WebSocket on loopback', /127\.0\.0\.1/.test(readme) && /authentication/i.test(readme));
+}
+
 async function main() {
   console.log('Frames: real-browser verification\n');
   let mock, browser;
@@ -315,6 +345,7 @@ async function main() {
     await sleep(400);
     mock = await startMock();
     await verifyTheme(browser);
+    await verifyDocs(browser);
   } catch (err) {
     check('run completed', false, err.stack || err.message);
   } finally {
