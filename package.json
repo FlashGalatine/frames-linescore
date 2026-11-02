@@ -1,0 +1,23 @@
+{
+  "name": "frames-linescore",
+  "version": "0.1.0",
+  "description": "A Streamer.bot-native line-score board for OBS: team names, innings, per-inning scores and a total, driven from chat, Stream Deck, hotkeys, or a browser control panel. No dedicated server.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Ashe \"Flash\" Galatine",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node mock-sb-server.mjs",
+    "verify:rules": "node verify-rules.mjs",
+    "verify": "node verify-rules.mjs && node verify.mjs",
+    "verify:cs": "node verify-cs.mjs",
+    "verify:render": "node verify-render.mjs",
+    "shots": "node tools/shots.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "comment": "verify:render and shots also need playwright-core (uses system Edge/Chrome): npm install --no-save playwright-core"
+}

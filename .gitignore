@@ -1,0 +1,4 @@
+node_modules/
+test-render*.png
+control-render.png
+from-csc/
