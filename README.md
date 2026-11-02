@@ -35,7 +35,7 @@ Get the code onto the machine that runs Streamer.bot. `<repo>` below means that 
    http://127.0.0.1:7474/frames-themes/ballpark/panels/board-1200x260.html     (1200×260)
    ```
 
-5. **Chat:** create a command `!ls` (Commands tab), and set its permission to **Moderators**. This is the only thing stopping any viewer from changing the board: the action trusts whoever Streamer.bot lets through. Add anyone else who should score, such as a tournament organizer, to the command's allowed users. Then, the step that's easy to miss, open the `Linescore Command` action and **add the command as a Trigger** on it.
+5. **Chat:** create a command `!ls` (Commands tab), and set its permission to **Moderators**. This is the only thing stopping any viewer from changing the board: the action trusts whoever Streamer.bot lets through. Add anyone else who should score, such as a tournament organizer, to the command's allowed users. Then, the step that's easy to miss, open the `Linescore Command` action and add a trigger: *Core → Commands → **Command Triggered***, then pick `!ls`. Not *Command Cooldown*, which sits right beside it and looks the same once it's added.
 6. **Drive it:**
 
    ```
@@ -155,7 +155,7 @@ The actions in `actions/` are generated: edit `actions/src`, then run `node tool
 
 ## Troubleshooting
 
-- **Chat command does nothing:** the command isn't a **trigger** on `Linescore Command`, or its text doesn't match what you type. Streamer.bot → Logs shows `[Linescore Command] token='…'` for every hit, and `ignored: …` with the reason when a command is refused.
+- **Chat command does nothing:** the command isn't a **trigger** on `Linescore Command`, the trigger is *Command Cooldown* rather than *Command Triggered* (the command then fires, but the action never runs, and Logs show no `[Linescore Command]` line), or its text doesn't match what you type. A message from Streamer.bot's bot account is also ignored if the command has Ignore Bot Account ticked, and on a channel where the bot and the broadcaster are one account, that means the broadcaster too. Streamer.bot → Logs shows `[Linescore Command] token='…'` for every hit, and `ignored: …` with the reason when a command is refused.
 - **`!ls t1win` was ignored:** the board is in free entry, the match is over, or another win landed under 30 seconds ago. Logs says which.
 - **A viewer could change the board:** `!ls` isn't set to Moderators. See step 5.
 - **Panels blank:** state never arrived. Check the WebSocket Server is on `:8080` with authentication off (or that the URL carries a matching `?sbport=`), and that the action is named exactly `Linescore Push` and **compiles**. A compile error broadcasts nothing. On a runtime failure, the action broadcasts `{ type: 'linescore:error', message }`.
