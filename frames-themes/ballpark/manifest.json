@@ -1,0 +1,11 @@
+{
+  "name": "ballpark",
+  "displayName": "Ballpark",
+  "version": "1.0.0",
+  "license": "MIT",
+  "author": "Flash Galatine",
+  "description": "A green stadium board: a panel of digit cells, one row per team, a total and a Ball / Strike / Out row. Every color and font is a CSS variable.",
+  "panels": [
+    { "file": "panels/board-1200x260.html", "label": "Line score board", "width": 1200, "height": 260 }
+  ]
+}

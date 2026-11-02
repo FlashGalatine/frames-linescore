@@ -219,6 +219,90 @@ async function verifyPanelPort(browser) {
   await page.close();
 }
 
+async function verifyTheme(browser) {
+  console.log('\n[theme: ballpark]');
+  const url = `${BASE}/frames-themes/ballpark/panels/board-1200x260.html?sbport=${WS_PORT}`;
+  const errors = [];
+  const page = await browser.newPage({ viewport: { width: 1200, height: 260 } });
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error' && !/WebSocket/.test(m.text())) errors.push(m.text()); });
+  await page.goto(url, { waitUntil: 'load' });
+  const text = (sel) => page.locator(sel).first().textContent();
+  const count = (sel) => page.locator(sel).count();
+  const visible = (sel) => page.locator(sel).first().isVisible();
+  const panelColor = (p) => p.evaluate(() => getComputedStyle(document.getElementById('board')).backgroundColor);
+
+  const painted = await page.waitForFunction(() => document.querySelector('.bp-name')?.textContent === 'Visitor', null, { timeout: 8000 }).then(() => true).catch(() => false);
+  check('fresh install paints', painted && await count('.bp-head') === 10 && await text('.bp-total') === '0', await count('.bp-head'));
+  check('the counts row shows on a fresh install', await visible('.bp-labels') && (await text('.bp-label[data-key="ball"]')).includes('Ball'));
+
+  await mockCmd('preset', 'sfl');
+  await mockCmd('t1name', 'Team East Coast');
+  await mockCmd('t2name', 'Team West Coast');
+  await mockCmd('t1win');
+  check('scores paint', await text('.bp-cell[data-team="1"][data-col="0"]') === '10' && await text('.bp-cell[data-team="2"][data-col="0"]') === '0');
+  check('the live column shows its points', await text('.bp-cell[data-team="1"][data-col="1"]') === '+10');
+  check('the leader is marked', await page.locator('.bp-total').nth(0).evaluate((n) => n.classList.contains('is-lead')));
+  await mockCmd('t1win');
+  await mockCmd('t2win');
+  check('extra column appears on a tie', await count('.bp-head') === 5 && await page.locator('.bp-head').nth(3).textContent() === 'EXTRA');
+  check('nobody is marked in a tie', await count('.bp-total.is-lead') === 0);
+  check('labels off collapses the row', !(await visible('.bp-labels')));
+  check('the title shows', await text('.bp-title') === 'TEAM BATTLE');
+  await page.screenshot({ path: resolve(__dirname, 'test-render.png') });
+
+  await mockCmd('ball', 'on');
+  await mockCmd('ball', 'name Games');
+  await mockCmd('ball', '2');
+  check('renamed label paints', (await text('.bp-label[data-key="ball"]')).includes('Games') && (await text('.bp-label[data-key="ball"]')).includes('2'));
+  check('labels that are off stay off', !(await page.locator('.bp-label[data-key="strike"]').isVisible()));
+
+  await mockCmd('hide');
+  check('hidden paints nothing', !(await visible('#board')));
+  await mockCmd('show');
+  check('show brings it back', await visible('#board'));
+
+  // Worst case: 12 columns and long names
+  const LONG = 'The Extremely Long Team Name Of The Year!';
+  await mockCmd('preset', 'baseball');
+  await mockCmd('innings', '12');
+  await mockCmd('t1name', LONG);
+  await mockCmd('t2name', 'Wé "quote" \\ <b>not bold</b> 名前');
+  await mockCmd('title', 'A Title Too');
+  for (const v of ['1 99', '2 88', '3 77']) await mockCmd('t1', v);
+  check('names are exactly as typed', await page.locator('.bp-name').nth(0).textContent() === LONG && await page.locator('.bp-name').nth(1).textContent() === 'Wé "quote" \\ <b>not bold</b> 名前');
+  check('names are text, never markup', await count('.bp-name b') === 0);
+  const fit = await page.evaluate(() => [...document.querySelectorAll('.bp-name')].every((n) => n.scrollWidth <= n.clientWidth + 1 && parseFloat(getComputedStyle(n).fontSize) >= 14));
+  check('long names fit the name cell', fit);
+  const box = await page.evaluate(() => { const r = document.getElementById('board').getBoundingClientRect(); return { right: r.right, bottom: r.bottom }; });
+  check('12 columns and every row stay inside the source', box.right <= 1200 && box.bottom <= 260, JSON.stringify(box));
+  await page.screenshot({ path: resolve(__dirname, 'test-render-worst.png') });
+
+  // CSS-only skins
+  const base = await panelColor(page);
+  for (const skin of ['crosley', 'led']) {
+    const p = await browser.newPage({ viewport: { width: 1200, height: 260 } });
+    await p.goto(`${url}&skin=${skin}`, { waitUntil: 'load' });
+    await p.waitForSelector('.bp-name');
+    await sleep(150);
+    check(`the ${skin} skin changes colors by CSS alone`, await panelColor(p) !== base, await panelColor(p));
+    await p.screenshot({ path: resolve(__dirname, `test-render-${skin}.png`) });
+    await p.close();
+  }
+  const odd = await browser.newPage({ viewport: { width: 1200, height: 260 } });
+  const asked = [];
+  odd.on('request', (r) => asked.push(r.url()));
+  await odd.goto(`${url}&skin=../../../evil`, { waitUntil: 'load' });
+  check('a bad skin name loads nothing extra', !asked.some((u) => /evil[^&]*\.css/.test(u)) && !asked.some((u) => u.includes('/skins/')), asked.join(' '));
+  await odd.close();
+
+  await fetch(`${BASE}/mock/drop`);
+  await sleep(200);
+  check('offline dims', await page.evaluate(() => document.body.classList.contains('offline') && +getComputedStyle(document.getElementById('board')).opacity < 1));
+  check('no console errors', errors.length === 0, errors.join(' | '));
+  await page.close();
+}
+
 async function main() {
   console.log('Frames: real-browser verification\n');
   let mock, browser;
@@ -227,6 +311,10 @@ async function main() {
     browser = await launch();
     await verifyPanel(browser);
     await verifyPanelPort(browser);
+    mock.kill();                 // the theme checks start from a fresh install
+    await sleep(400);
+    mock = await startMock();
+    await verifyTheme(browser);
   } catch (err) {
     check('run completed', false, err.stack || err.message);
   } finally {

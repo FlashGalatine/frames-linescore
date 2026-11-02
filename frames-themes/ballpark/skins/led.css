@@ -1,0 +1,16 @@
+/* A school-field electronic board: orange panel, italic labels, red LED digits. */
+:root {
+  --bp-panel: #ef7d22;
+  --bp-frame: #ffffff;
+  --bp-cell: #0d0d0d;
+  --bp-text: #ffffff;
+  --bp-digit: #f0261a;
+  --bp-zero: #7a1c16;
+  --bp-lead: #ffb300;
+  --bp-live: #ffb300;
+  --bp-font: "Arial Black", Arial, sans-serif;
+  --bp-digit-font: "Courier New", Consolas, monospace;
+  --bp-radius: 0;
+}
+.bp-title, .bp-head, .bp-label { font-style: italic; }
+.bp-cell, .bp-total, .bp-label b { font-weight: 700; font-style: normal; }

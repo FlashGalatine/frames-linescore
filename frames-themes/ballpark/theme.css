@@ -1,0 +1,46 @@
+/* Ballpark: a green stadium board. Re-skin it by overriding these variables: see the
+   skins/ folder and docs/THEMING.md. Nothing below this block should need to change. */
+:root {
+  --bp-panel: #1f4d3a;        /* the board itself */
+  --bp-frame: #c9ccc4;        /* the frame around it */
+  --bp-cell: #111413;         /* digit and name cells */
+  --bp-text: #f4f5f0;         /* labels and team names */
+  --bp-digit: #f4f5f0;        /* numbers that scored */
+  --bp-zero: #8b938d;         /* a scored 0 */
+  --bp-lead: #ffd23f;         /* the leader's total */
+  --bp-live: #ffd23f;         /* the live column */
+  --bp-font: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
+  --bp-digit-font: Impact, "Arial Narrow", sans-serif;
+  --bp-radius: 3px;
+}
+
+html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+body { width: 1200px; height: 260px; font-family: var(--bp-font); }
+
+.bp-board {
+  display: inline-block; box-sizing: border-box; max-width: 1200px; max-height: 260px;
+  padding: 12px 16px; background: var(--bp-panel); color: var(--bp-text);
+  border: 4px solid var(--bp-frame); border-radius: var(--bp-radius);
+  transition: opacity .4s ease;
+}
+body.offline .bp-board { opacity: .35; }
+.bp-board.is-hidden { display: none; }
+
+.bp-title { font-weight: 700; font-size: 20px; line-height: 24px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bp-title:empty { display: none; }
+
+.bp-grid { display: grid; gap: 6px; align-items: stretch; }
+.bp-head { font-weight: 700; font-size: 18px; line-height: 24px; text-align: center; letter-spacing: .04em; white-space: nowrap; overflow: hidden; }
+.bp-head.is-live { color: var(--bp-live); }
+.bp-name, .bp-cell, .bp-total { height: 48px; background: var(--bp-cell); border-radius: var(--bp-radius); }
+.bp-name { box-sizing: border-box; padding: 0 12px; font-weight: 700; font-size: 28px; line-height: 48px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bp-cell, .bp-total { font-family: var(--bp-digit-font); font-size: 32px; line-height: 48px; text-align: center; color: var(--bp-digit); }
+.bp-cell.is-zero { color: var(--bp-zero); }
+.bp-cell.is-live { color: var(--bp-live); font-size: 22px; box-shadow: inset 0 0 0 2px var(--bp-live); }
+.bp-total { margin-left: 8px; }
+.bp-total.is-lead { color: var(--bp-lead); }
+
+.bp-labels { display: flex; gap: 28px; margin-top: 8px; }
+.bp-labels:empty, .bp-labels.is-off { display: none; }
+.bp-label { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.bp-label b { display: inline-block; min-width: 32px; height: 32px; padding: 0 4px; box-sizing: border-box; background: var(--bp-cell); border-radius: var(--bp-radius); font-family: var(--bp-digit-font); font-weight: 400; font-size: 24px; line-height: 32px; text-align: center; color: var(--bp-digit); }

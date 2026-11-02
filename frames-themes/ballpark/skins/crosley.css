@@ -1,0 +1,15 @@
+/* A hand-painted outfield board: red boards, white stencil numbers on cards. */
+:root {
+  --bp-panel: #c8102e;
+  --bp-frame: #f2e9dc;
+  --bp-cell: #f7f2e8;
+  --bp-text: #fbf7ef;
+  --bp-digit: #2a2a2e;
+  --bp-zero: #8d8a84;
+  --bp-lead: #c8102e;
+  --bp-live: #ffe08a;
+  --bp-font: Stencil, Impact, "Arial Narrow", sans-serif;
+  --bp-digit-font: Stencil, Impact, "Arial Narrow", sans-serif;
+  --bp-radius: 0;
+}
+.bp-name { color: #2a2a2e; font-weight: 400; }
