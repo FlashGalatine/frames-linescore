@@ -62,6 +62,10 @@ Add the listener before loading panel-core, or you can miss the first event.
 
 `panel-core` also toggles the class `offline` on `<body>` when the connection to Streamer.bot drops. A frozen score asserts a stale fact, so dim the board.
 
+Nothing arrives until the first `linescore:update`, and with Streamer.bot off it never does. If your board has a frame or a background of its own, start it hidden and show it on that first event, or the source shows an empty frame.
+
+If the push action fails, `panel-core` dispatches `linescore:error` with `{ type, message }` in `event.detail`. Listening is optional: the control panel shows the message in its status line.
+
 ## A complete theme from scratch
 
 Save this as `frames-themes/mytheme/board.html`. It's complete and runs as is:

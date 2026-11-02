@@ -104,11 +104,13 @@ Run `!ls t1win` or `!ls t2win` as each set ends. At 20-20 the EXTRA column appea
 Open **`http://127.0.0.1:7474/frames-shared/control.html`** in a browser tab, or in OBS add it as a **Custom Browser Dock**. It has team names, an editable grid, winner buttons, Undo, the format, the labels and New match. It drives the same `Linescore Command` over Streamer.bot's WebSocket and reflects live state, so it never fights chat or a Stream Deck.
 
 - **It works on the streaming PC only.** Moderators and TOs elsewhere use chat.
-- Edited but unsaved fields survive live updates. **Any Set click applies every edited field at once.**
+- Edited but unsaved fields survive live updates. **Any Set click, or Enter in a text field, applies every edited field at once.**
 - A double-click on any button counts once. Clicks on different buttons queue up and land in order.
 - New match, and a preset when scores exist, take a second, separate click, in case you hit them by accident on air. Undo brings the scores back if you still meant not to.
 - The buttons are disabled while the connection is down, and nothing clicked then is replayed when it comes back. Text you typed stays until you can Set it.
-- A half-typed cell stays half-typed when a result arrives from chat, even one that adds a column.
+- A half-typed cell stays half-typed when a result arrives from chat, even one that adds a column. A box catches up with live state when you leave it, and a value Streamer.bot rejects goes back to the current one.
+- While both names are still the defaults, the panel says that some themes stay hidden until real team names are set. Ballpark shows them; a theme like NFC's doesn't, so Show board can look like it did nothing.
+- If the push action fails, its error appears in the status line until the next good update.
 
 ## Make it yours
 
@@ -158,8 +160,8 @@ The actions in `actions/` are generated: edit `actions/src`, then run `node tool
 - **Chat command does nothing:** the command isn't a **trigger** on `Linescore Command`, the trigger is *Command Cooldown* rather than *Command Triggered* (the command then fires, but the action never runs, and Logs show no `[Linescore Command]` line), or its text doesn't match what you type. A message from Streamer.bot's bot account is also ignored if the command has Ignore Bot Account ticked, and on a channel where the bot and the broadcaster are one account, that means the broadcaster too. Streamer.bot → Logs shows `[Linescore Command] token='…'` for every hit, and `ignored: …` with the reason when a command is refused.
 - **`!ls t1win` was ignored:** the board is in free entry, the match is over, or another win landed under 30 seconds ago. Logs says which.
 - **A viewer could change the board:** `!ls` isn't set to Moderators. See step 5.
-- **Panels blank:** state never arrived. Check the WebSocket Server is on `:8080` with authentication off (or that the URL carries a matching `?sbport=`), and that the action is named exactly `Linescore Push` and **compiles**. A compile error broadcasts nothing. On a runtime failure, the action broadcasts `{ type: 'linescore:error', message }`.
-- **The board stayed hidden:** someone ran `hide`, which survives New match and a restart. Run `!ls show`, or any `preset`.
+- **Panels blank:** state never arrived. Check the WebSocket Server is on `:8080` with authentication off (or that the URL carries a matching `?sbport=`), and that the action is named exactly `Linescore Push` and **compiles**. A compile error broadcasts nothing. On a runtime failure, the action broadcasts `{ type: 'linescore:error', message }`, and the control panel shows the message in its status line. Ballpark shows nothing at all until its first state arrives.
+- **The board stayed hidden:** someone ran `hide`, which survives New match and a restart. Run `!ls show`, or any `preset`. Some themes also stay hidden until real team names are set, and the panel says so while both are still the defaults.
 - **`npm start` fails with `EADDRINUSE`:** real Streamer.bot already owns the ports. Relocate the mock with `SB_HTTP_PORT=7480 SB_WS_PORT=8090 npm start`, or just use Streamer.bot.
 
 ## Author & support

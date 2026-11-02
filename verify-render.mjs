@@ -65,6 +65,38 @@ async function verifyPanel(browser) {
   check('panel shows synced names', synced);
   check('panel says it is connected', /connected/.test(await page.locator('#status').textContent()));
 
+  // Some themes paint nothing on the default names, so Show board needs saying why
+  const hint = () => page.locator('#names-hint').isVisible();
+  check('a fresh install warns that some themes stay hidden', await hint() && /team names/.test(await page.locator('#names-hint').textContent()));
+  await mockCmd('t1name', 'East');
+  check('one real name is enough to clear the warning', !(await hint()));
+  await mockCmd('t1name', 'Visitor');
+  check('the warning comes back on the defaults', await hint());
+  await page.locator('#t2name').fill('Typed, not set');
+  await page.locator('#t1name').focus();
+  await mockCmd('title', '');
+  check('a name only counts once it is set', await hint());
+  await page.locator('#t2name').fill('Home');
+  await page.locator('[data-set]').first().click();
+  await sleep(250);
+  check('and the warning stays after setting them back', await hint());
+  const raw = async (data) => { await fetch(`${BASE}/mock/raw?json=${encodeURIComponent(JSON.stringify(data))}`); await sleep(120); };
+  const fresh = await state();
+  await raw({ ...fresh, teams: fresh.teams.map((t) => ({ ...t, name: ' ' })) });
+  check('blank names count as defaults', await hint());
+  await raw({ ...fresh, teams: [{ ...fresh.teams[0], name: 'Home' }, fresh.teams[1]] });
+  check('"Home" on the first team is a real name, as it is to the NFC skin', !(await hint()));
+  await raw(fresh);
+
+  // A push failure reaches the operator, as text, without taking the panel down
+  const status = () => page.locator('#status').textContent();
+  await raw({ type: 'linescore:error', message: 'Push <b>failed</b>' });
+  check('linescore:error shows in the status line', (await status()).includes('Push <b>failed</b>'), await status());
+  check('as text, never markup', await page.locator('#status b').count() === 0);
+  check('and the panel stays connected', /^connected/.test((await status()).trim()) && !(await page.locator('#undo').isDisabled()));
+  await mockCmd('title', '');
+  check('the next good update clears it', !(await status()).includes('failed'), await status());
+
   // One click, one command
   await page.click('[data-preset="sfl"]');
   await sleep(200);
@@ -201,6 +233,70 @@ async function verifyPanel(browser) {
   await mockCmd('worth', '10 10 20 x5');
   await clearMatch();
 
+  // A focused cell catches up when it loses focus
+  const cellA = 'input[data-team="1"][data-col="0"]';
+  await mockCmd('t1', '1 10');
+  await page.locator(cellA).focus();
+  await mockCmd('t1', '1 30');
+  check('a focused cell is left alone by a broadcast', await input(cellA) === '10');
+  await page.locator('#t1name').focus();
+  await sleep(50);
+  check('and catches up when focus leaves', await input(cellA) === '30', await input(cellA));
+  await mockCmd('t1', '1 10');
+
+  // A rejected value doesn't stay on screen: the mock, like the C#, broadcasts nothing for it
+  mark = (await log()).length;
+  await page.fill(cellA, '1.5');
+  await page.locator('#t1name').focus();
+  await sleep(150);
+  check('a rejected cell is sent', (await log()).slice(mark).some((c) => c.command === 't1' && c.value === '1 1.5'), JSON.stringify((await log()).slice(mark)));
+  await sleep(450);
+  check('and goes back to the last state when the command times out', await input(cellA) === '10', await input(cellA));
+  await page.fill('[data-worth="0"]', '1.5');
+  await page.locator('#t1name').focus();
+  await sleep(600);
+  check('so does a rejected points box', await input('[data-worth="0"]') === '10', await input('[data-worth="0"]'));
+
+  // A value on its way doesn't flash back to the old one while it travels
+  const flashes = await page.evaluate(async (sel) => {
+    const box = document.querySelector(sel), seen = [];
+    box.focus();
+    box.value = '40';
+    box.dispatchEvent(new Event('input', { bubbles: true }));
+    box.dispatchEvent(new Event('change', { bubbles: true }));
+    box.blur();
+    for (let i = 0; i < 40; i++) { seen.push(box.value); await new Promise((r) => setTimeout(r, 2)); }
+    return seen;
+  }, cellA);
+  check('a value on its way never flashes back', flashes.every((v) => v === '40'), flashes.join(' '));
+  await sleep(200);
+  await mockCmd('t1', '1 10');
+
+  // Half-typed text survives losing focus, until it's Set
+  await page.locator('#t2name').fill('Half typed too');
+  await page.locator(cellA).focus();
+  await sleep(50);
+  check('focus leaving keeps unsaved text', await input('#t2name') === 'Half typed too');
+
+  // Enter in a text field is Set. #t1name still holds its own half-typed text, which Set sends as well
+  await page.locator('#t2name').fill('Enter Team');
+  mark = (await log()).length;
+  await page.keyboard.press('Enter');
+  await sleep(250);
+  let sentNow = (await log()).slice(mark);
+  check('Enter in a name field sends one setmany', sentNow.length === 1 && sentNow[0].command === 'setmany' && sentNow[0].t2name === 'Enter Team' && sentNow[0].t1name === 'Half typed', JSON.stringify(sentNow));
+  check('and the name lands', (await state()).teams[1].name === 'Enter Team');
+  mark = (await log()).length;
+  await page.keyboard.press('Enter');
+  await sleep(200);
+  check('Enter with nothing edited sends nothing', (await log()).length === mark, JSON.stringify((await log()).slice(mark)));
+  await page.locator('#t2name').fill('名前');
+  mark = (await log()).length;
+  await page.evaluate(() => document.getElementById('t2name').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true })));
+  await sleep(200);
+  check('Enter that commits an IME character sends nothing', (await log()).length === mark, JSON.stringify((await log()).slice(mark)));
+  await page.locator('#t1name').fill('Half typed');
+
   // Batched set
   await page.locator('#t2name').fill('West');
   const before = (await log()).length;
@@ -310,6 +406,20 @@ async function verifyPanelPort(browser) {
 async function verifyTheme(browser) {
   console.log('\n[theme: ballpark]');
   const url = `${BASE}/frames-themes/ballpark/panels/board-1200x260.html?sbport=${WS_PORT}`;
+
+  // Nothing to show yet: no empty frame on air
+  const noSb = await browser.newPage({ viewport: { width: 1200, height: 260 } });
+  await noSb.goto(`${BASE}/frames-themes/ballpark/panels/board-1200x260.html?sbport=9`, { waitUntil: 'load' });
+  await sleep(200);
+  check('with Streamer.bot off, it paints nothing', !(await noSb.locator('#board').isVisible()));
+  await noSb.close();
+  const noState = await browser.newPage({ viewport: { width: 1200, height: 260 } });
+  await noState.routeWebSocket(/.*/, () => {}); // connected, and no payload ever comes
+  await noState.goto(url, { waitUntil: 'load' });
+  await sleep(600);
+  check('connected but before the first state, it paints nothing', !(await noState.locator('#board').isVisible()));
+  await noState.close();
+
   const errors = [];
   const page = await browser.newPage({ viewport: { width: 1200, height: 260 } });
   page.on('pageerror', (e) => errors.push(e.message));
@@ -322,6 +432,7 @@ async function verifyTheme(browser) {
 
   const painted = await page.waitForFunction(() => document.querySelector('.bp-name')?.textContent === 'Visitor', null, { timeout: 8000 }).then(() => true).catch(() => false);
   check('fresh install paints', painted && await count('.bp-head') === 10 && await text('.bp-total') === '0', await count('.bp-head'));
+  check('the first state shows the board', await visible('#board'));
   check('the counts row shows on a fresh install', await visible('.bp-labels') && (await text('.bp-label[data-key="ball"]')).includes('Ball'));
 
   await mockCmd('preset', 'sfl');
@@ -387,6 +498,7 @@ async function verifyTheme(browser) {
   await fetch(`${BASE}/mock/drop`);
   await sleep(200);
   check('offline dims', await page.evaluate(() => document.body.classList.contains('offline') && +getComputedStyle(document.getElementById('board')).opacity < 1));
+  check('and keeps the last state on screen', await visible('#board'));
   check('no console errors', errors.length === 0, errors.join(' | '));
   await page.close();
 }

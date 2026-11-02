@@ -1,13 +1,14 @@
 // panel-core: the Streamer.bot transport every Frames theme loads. Adapted from Tally's.
 //
 // Serve this file at /frames-shared/panel-core.js. Panels load it by that absolute path
-// and listen for one window CustomEvent:
+// and listen for window CustomEvents:
 //
 //   linescore:update, detail = the full payload (see docs/THEMING.md)
+//   linescore:error,  detail = { type, message }, when the push action fails (optional)
 //
 // It speaks Streamer.bot's WebSocket protocol with a raw browser WebSocket (no library,
 // no CDN, so it works offline in the OBS CEF browser source), subscribes to General.Custom
-// and dispatches every broadcast whose data.type is 'linescore:update'.
+// and dispatches every broadcast whose data.type is one of those.
 //
 // Streamer.bot has no state-on-connect replay. We recreate it: after the Subscribe is
 // acknowledged we fire a DoAction naming the push action, which re-broadcasts the current
@@ -93,9 +94,9 @@
       if (m && m.event && m.event.source === 'General' && m.event.type === 'Custom') {
         let d = m.data;
         if (typeof d === 'string') { try { d = JSON.parse(d); } catch { return; } }
-        if (d && d.type === 'linescore:update') {
+        if (d && (d.type === 'linescore:update' || d.type === 'linescore:error')) {
           log('General.Custom', d.type);
-          window.dispatchEvent(new CustomEvent('linescore:update', { detail: d }));
+          window.dispatchEvent(new CustomEvent(d.type, { detail: d }));
         }
       }
     };

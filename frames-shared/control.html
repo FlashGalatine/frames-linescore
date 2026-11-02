@@ -13,6 +13,7 @@
   #status { color:var(--sub); font-size:12px; margin:0 0 12px; }
   #status::before { content:""; display:inline-block; width:9px; height:9px; border-radius:50%; background:#6b7280; margin-right:6px; }
   #status.on::before { background:#22c55e; }
+  #status.err { color:#f87171; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:10px; }
   .card h2 { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--sub); margin:0 0 8px; }
   .row { display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap; }
@@ -92,7 +93,8 @@
 </section>
 
 <section class="card">
-  <div class="row"><button class="wide danger" id="new-match">New match</button><button class="wide" id="hide">Hide board</button></div>
+  <div class="row" style="margin-bottom:0"><button class="wide danger" id="new-match">New match</button><button class="wide" id="hide">Hide board</button></div>
+  <p class="hint" id="names-hint" hidden>Team names aren't set yet. Some themes stay hidden until real team names are set.</p>
 </section>
 
 <script>
@@ -140,12 +142,22 @@
     inFlight = true;
     lastSend = Date.now();
     ws.send(JSON.stringify({ request: 'DoAction', id: String(++msgId), action: { name: CMD_ACTION }, args: queue.shift() }));
-    flightTimer = setTimeout(landed, FLIGHT_MS);
+    flightTimer = setTimeout(timedOut, FLIGHT_MS);
   }
   function landed() {
     inFlight = false;
     clearTimeout(flightTimer);
     pump();
+  }
+  // No broadcast came back, so the command was rejected and what it left in its box was never true.
+  function timedOut() {
+    landed();
+    refresh();
+  }
+  // Not while a command is on its way, or its box flashes back to the old value: the broadcast
+  // or the timeout that ends it repaints anyway.
+  function refresh() {
+    if (S && !inFlight && !queue.length) render();
   }
 
   // ── Text fields ────────────────────────────────────────────────────────────
@@ -168,6 +180,13 @@
     if (el.dataset.field && dirty[el.dataset.field]) return;
     if (el.value !== String(value)) el.value = value;
   }
+  // Enter is Set, except while an IME is composing, where it only commits the character.
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.isComposing && e.target.dataset.field) flushFields();
+  });
+  // A focused box sits out every broadcast, so it catches up when focus leaves. Deferred, because
+  // removing a focused box fires this from inside a render.
+  document.addEventListener('focusout', function () { setTimeout(refresh, 0); });
 
   // ── Two-step buttons: clearing scores on air takes a second, separate click ─
   function armed(btn, action) {
@@ -421,6 +440,12 @@
     });
   }
 
+  // Some themes paint nothing on these names and some do, so Show board can look broken.
+  function stillDefault(t, name) {
+    var n = String(S.teams[t].name).trim();
+    return !n || n === name;
+  }
+
   function render() {
     reflect($('t1name'), S.teams[0].name);
     reflect($('t2name'), S.teams[1].name);
@@ -433,12 +458,20 @@
     renderFormat();
     renderLabels();
     $('hide').textContent = S.hidden ? 'Show board' : 'Hide board';
+    $('names-hint').hidden = !(stillDefault(0, 'Visitor') && stillDefault(1, 'Home'));
   }
 
   // ── The socket ─────────────────────────────────────────────────────────────
+  var statusText = '', statusError = '';
+  function paintStatus() {
+    $('status').textContent = statusError ? statusText + ' · Streamer.bot error: ' + statusError : statusText;
+    $('status').classList.toggle('err', !!statusError);
+  }
   function setStatus(on, text) {
+    statusText = text;
+    statusError = '';
     $('status').classList.toggle('on', on);
-    $('status').textContent = text;
+    paintStatus();
     document.querySelectorAll('button').forEach(function (b) { b.disabled = !on; });
   }
 
@@ -467,8 +500,16 @@
         if (typeof d === 'string') { try { d = JSON.parse(d); } catch (err) { return; } }
         if (d && d.type === 'linescore:update') {
           S = d;
+          statusError = '';
+          paintStatus();
           render();
           landed();
+        } else if (d && d.type === 'linescore:error') {
+          // The push failed, so no state is coming back for whatever was in flight.
+          statusError = String(d.message || 'the push failed');
+          paintStatus();
+          landed();
+          refresh();
         }
       }
     };
@@ -477,6 +518,7 @@
       queue.length = 0;
       inFlight = false;
       clearTimeout(flightTimer);
+      refresh();
       setStatus(false, 'disconnected · retrying…');
       setTimeout(connect, RECONNECT_MS);
     };

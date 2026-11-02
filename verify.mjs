@@ -75,10 +75,12 @@ async function runCore() {
   class CustomEvent { constructor(type, init) { this.type = type; this.detail = init && init.detail; } }
 
   window.addEventListener('linescore:update', (e) => push(e.detail));
+  const errors = [];
+  window.addEventListener('linescore:error', (e) => errors.push(e.detail));
   const src = await readFile(CORE, 'utf8');
   const fn = new Function('window', 'document', 'location', 'WebSocket', 'CustomEvent', 'URLSearchParams', src);
   fn(window, document, { search: '' }, RecordingSocket, CustomEvent, URLSearchParams);
-  return { next, sent, pending: () => q.length, offline: () => offline };
+  return { next, sent, errors, pending: () => q.length, offline: () => offline };
 }
 
 // Which URL the core would dial for a given query, with no real connection made.
@@ -130,6 +132,10 @@ async function main() {
     await fetch(`${BASE}/mock/raw?json=${encodeURIComponent(JSON.stringify({ type: 'scoreboard:update', player1: {} }))}`);
     await sleep(150);
     check('scoreboard:update is ignored', a.pending() === before);
+    await fetch(`${BASE}/mock/raw?json=${encodeURIComponent(JSON.stringify({ type: 'linescore:error', message: 'push failed' }))}`);
+    await sleep(150);
+    check('linescore:error reaches the page as its own event', a.errors.at(-1)?.message === 'push failed', JSON.stringify(a.errors));
+    check('and never as an update', a.pending() === before);
 
     console.log('\n[5] the port override');
     for (const [search, want] of [['?sbport=9090', 'ws://127.0.0.1:9090/'], ['?sbport=1@evil.example', 'ws://127.0.0.1:8080/'], ['?sbport=99999', 'ws://127.0.0.1:8080/'], ['', 'ws://127.0.0.1:8080/']]) {

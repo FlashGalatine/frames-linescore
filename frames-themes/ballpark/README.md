@@ -6,7 +6,7 @@ A green stadium board on one browser source, 1200×260: a title, an inning heade
 http://127.0.0.1:7474/frames-themes/ballpark/panels/board-1200x260.html
 ```
 
-It fits up to 12 columns. Team names shrink from 28px to 14px to fit, then end in an ellipsis.
+It fits up to 12 columns. Team names shrink from 28px to 14px to fit, then end in an ellipsis. It paints nothing until its first state arrives, so with Streamer.bot off the source is simply empty.
 
 ## Skins
 
