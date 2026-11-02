@@ -6,7 +6,7 @@ using System.Collections.Generic;
 public class CPHInline
 {
     const int UndoMax = 20;
-    const long ChatWinGuardMs = 5000;
+    const long ChatGuardMs = 30000;
 
     static readonly string[] Known = {
         "t1win", "t2win", "undo", "t1", "t2", "t1+", "t1-", "t2+", "t2-", "next",
@@ -93,6 +93,8 @@ public class CPHInline
             {
                 if (d.Fixed) { warning = "`next` is for free entry: fixed points move on by themselves"; return false; }
                 if (d.Live < 0) { warning = "there's no live inning"; return false; }
+                if (Refused("next")) { warning = GuardWarning("next"); return false; }
+                Stamp("next");
                 string snap = Snapshot();
                 if (!d.Cell(0, d.Live).HasValue) SetCell(0, d.Live, 0);
                 if (!d.Cell(1, d.Live).HasValue) SetCell(1, d.Live, 0);
@@ -132,13 +134,19 @@ public class CPHInline
             {
                 string which = value.ToLowerInvariant();
                 if (which != "sfl" && which != "baseball") { warning = "presets are sfl and baseball"; return false; }
+                string snap = Snapshot();
                 ApplyPreset(which == "sfl");
+                KeepUndo(snap);
                 return true;
             }
             case "reset":
+            {
+                string snap = Snapshot();
                 ClearScores();
                 ResetLabelValues();
+                KeepUndo(snap);
                 return true;
+            }
             case "hide": Set("ls.hidden", "1"); return true;
             case "show": Set("ls.hidden", "0"); return true;
             case "setmany": return SetMany(ref warning);
@@ -153,25 +161,50 @@ public class CPHInline
         if (!d.Fixed) { warning = "winner commands need fixed points (`worth` or `preset sfl`)"; return false; }
         if (d.Live < 0) { warning = "the match is over"; return false; }
 
-        long now, last;
-        if (!long.TryParse(Arg("_now", null) ?? "", NumberStyles.None, CultureInfo.InvariantCulture, out now))
-            now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        // Two moderators typing the same result must not award two sets. The panel has
-        // its own double-click handling, so it isn't held to this.
-        if (Arg("source", "") != "panel"
-            && long.TryParse(Var("ls.lastwin", ""), NumberStyles.None, CultureInfo.InvariantCulture, out last)
-            && now - last >= 0 && now - last < ChatWinGuardMs)
-        {
-            warning = "another win landed under " + (ChatWinGuardMs / 1000) + " seconds ago";
-            return false;
-        }
+        if (Refused("win")) { warning = GuardWarning("win"); return false; }
+        Stamp("win");
 
         string snap = Snapshot();
         SetCell(winner, d.Live, ColumnWorth(d, d.Live));
         SetCell(1 - winner, d.Live, 0);
-        Set("ls.lastwin", now.ToString(CultureInfo.InvariantCulture));
         KeepUndo(snap);
         return true;
+    }
+
+    // Two people typing the same thing, or a panel click on top of a chat command, must not
+    // count twice: stream delay plus typing puts them seconds apart. Only panel-after-panel
+    // is free, because the panel handles its own double-clicks and a burst there is deliberate.
+    bool Refused(string key)
+    {
+        long last;
+        if (!long.TryParse(Var("ls.last" + key, ""), NumberStyles.None, CultureInfo.InvariantCulture, out last)) return false;
+        long since = Now() - last;
+        if (since < 0 || since >= ChatGuardMs) return false;
+        return !(Arg("source", "") == "panel" && Var("ls.last" + key + "from", "") == "panel");
+    }
+
+    void Stamp(string key)
+    {
+        Set("ls.last" + key, Now().ToString(CultureInfo.InvariantCulture));
+        Set("ls.last" + key + "from", Arg("source", "") == "panel" ? "panel" : "chat");
+    }
+
+    void ClearGuard(string key)
+    {
+        Set("ls.last" + key, "");
+        Set("ls.last" + key + "from", "");
+    }
+
+    static string GuardWarning(string key)
+    {
+        return "another " + key + " landed under " + (ChatGuardMs / 1000) + " seconds ago, so this looks like a repeat";
+    }
+
+    long Now()
+    {
+        long now;
+        return long.TryParse(Arg("_now", null) ?? "", NumberStyles.None, CultureInfo.InvariantCulture, out now)
+            ? now : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     }
 
     // `t1 3 20` sets team 1's inning 3 to 20; `t1 3 -` clears it.
@@ -206,13 +239,16 @@ public class CPHInline
     {
         List<string> lines = UndoLines();
         if (lines.Count == 0) { warning = "nothing to undo"; return false; }
+        if (Refused("undo")) { warning = GuardWarning("undo"); return false; }
         string[] snap = lines[lines.Count - 1].Split('|');
         lines.RemoveAt(lines.Count - 1);
         Set("ls.t1scores", snap[0]);
         Set("ls.t2scores", snap[1]);
         Set("ls.live", snap[2]);
         Set("ls.undo", string.Join("\n", lines.ToArray()));
-        Set("ls.lastwin", "");
+        ClearGuard("win"); // the correction comes straight after
+        ClearGuard("next");
+        Stamp("undo");
         return true;
     }
 
@@ -268,6 +304,7 @@ public class CPHInline
         Set("ls.extralabel", sfl ? "EXTRA" : "");
         Set("ls.totallabel", sfl ? "TOTAL" : "R");
         Set("ls.title", sfl ? "TEAM BATTLE" : "");
+        Set("ls.hidden", "0"); // setting up a format means the board is wanted, even if last night ended on hide
         for (int i = 0; i < LabelKeys.Length; i++)
         {
             Set("ls." + LabelKeys[i] + ".on", sfl ? "0" : "1");
@@ -282,8 +319,9 @@ public class CPHInline
         Set("ls.t1scores", "");
         Set("ls.t2scores", "");
         Set("ls.live", "0");
-        Set("ls.undo", "");
-        Set("ls.lastwin", "");
+        ClearGuard("win");
+        ClearGuard("undo");
+        ClearGuard("next");
     }
 
     void ResetLabelValues()

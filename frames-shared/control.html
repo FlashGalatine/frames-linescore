@@ -25,6 +25,8 @@
   label { color:var(--sub); font-size:12px; }
   button { background:#2a2d38; border:1px solid var(--line); color:var(--text); border-radius:7px; padding:7px 10px; font:inherit; cursor:pointer; }
   button:hover { border-color:var(--accent); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button:disabled:hover { border-color:var(--line); }
   button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
   button.big { flex:1; min-width:130px; padding:12px 8px; font-weight:700; background:var(--accent); border-color:var(--accent); color:#fff; }
   button.danger { border-color:#7f1d1d; }
@@ -110,7 +112,7 @@
   var port = /^\d{1,5}$/.test(sbport) && +sbport >= 1 && +sbport <= 65535 ? sbport : '8080';
   var WS_URL = window.__SB_WS_URL || 'ws://127.0.0.1:' + port + '/';
   var CMD_ACTION = 'Linescore Command', SYNC_ACTION = 'Linescore Push';
-  var FLIGHT_MS = 400, MIN_GAP_MS = 120, DOUBLE_CLICK_MS = 400, ARMED_MS = 3000, RECONNECT_MS = 2000, SYNC_FALLBACK_MS = 400;
+  var FLIGHT_MS = 400, MIN_GAP_MS = 120, DOUBLE_CLICK_MS = 400, ARMED_MS = 3000, ARM_MIN_MS = 600, RECONNECT_MS = 2000, SYNC_FALLBACK_MS = 400;
 
   var $ = function (id) { return document.getElementById(id); };
   var ws = null, msgId = 0, S = null;
@@ -121,11 +123,15 @@
   // FLIGHT_MS (a rejected command broadcasts nothing), and never under MIN_GAP_MS apart.
   var queue = [], inFlight = false, lastSend = 0, flightTimer = null;
 
+  // Returns false when the connection is down, and the click does nothing at all: replaying
+  // it on reconnect would score a result the operator has long since moved past.
   function send(command, value, extra) {
+    if (!ws || ws.readyState !== 1) return false;
     var args = { command: command, value: value == null ? '' : String(value) };
     if (extra) Object.keys(extra).forEach(function (k) { args[k] = extra[k]; });
     queue.push(args);
     pump();
+    return true;
   }
   function pump() {
     if (inFlight || !queue.length || !ws || ws.readyState !== 1) return;
@@ -155,7 +161,7 @@
     document.querySelectorAll('[data-field]').forEach(function (el) {
       if (dirty[el.dataset.field]) { extra[el.dataset.field] = el.value; any = true; }
     });
-    if (any) { dirty = {}; send('setmany', '', extra); }
+    if (any && send('setmany', '', extra)) dirty = {};
   }
   function reflect(el, value) {
     if (document.activeElement === el) return;
@@ -163,15 +169,17 @@
     if (el.value !== String(value)) el.value = value;
   }
 
-  // ── Two-step buttons: clearing scores on air takes a second click ──────────
+  // ── Two-step buttons: clearing scores on air takes a second, separate click ─
   function armed(btn, action) {
     if (btn.classList.contains('armed')) {
+      if (Date.now() - btn._armedAt < ARM_MIN_MS) return;
       clearTimeout(btn._timer);
       btn.classList.remove('armed');
       btn.textContent = btn.dataset.text;
       action();
       return;
     }
+    btn._armedAt = Date.now();
     btn.dataset.text = btn.textContent;
     btn.textContent = 'Click again to clear';
     btn.classList.add('armed');
@@ -190,6 +198,9 @@
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('button');
     if (!btn) return;
+    // The browser's own count: the second click of a double-click never counts, on any button.
+    // Scripted and keyboard clicks report 0, so winners keep a time window below as well.
+    if (e.detail > 1) return;
     if (btn.hasAttribute('data-set')) return flushFields();
     if (btn.dataset.win) {
       var now = Date.now();
@@ -206,8 +217,8 @@
       return send(btn.dataset.labelToggle, label && label.on ? 'off' : 'on');
     }
     switch (btn.id) {
-      case 'undo': return send('undo');
-      case 'next': return send('next');
+      case 'undo': return send('undo', '', { source: 'panel' });
+      case 'next': return send('next', '', { source: 'panel' });
       case 'mode-free': return send('free');
       case 'mode-fixed': return sendWorth();
       case 'innings-up': return S && send('innings', S.settings.innings + 1);
@@ -221,6 +232,7 @@
 
   document.addEventListener('change', function (e) {
     var d = e.target.dataset;
+    if (d.gone !== undefined) return;
     if (d.team) return send('t' + d.team, (+d.col + 1) + ' ' + (e.target.value === '' ? '-' : e.target.value));
     if (d.worth !== undefined) return sendWorth();
     if (d.labelValue) return send(d.labelValue, e.target.value === '' ? '0' : e.target.value);
@@ -243,45 +255,64 @@
   }
 
   // ── Rendering ──────────────────────────────────────────────────────────────
-  var gridColumns = -1, worthInnings = -1;
+  var gridBuilt = false, gridColumns = 0, worthBoxes = 0;
+
+  function el(tag, cls) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    return n;
+  }
+  function numberBox(min) {
+    var box = el('input');
+    box.type = 'number';
+    box.min = min;
+    return box;
+  }
+
+  // Columns come and go one at a time, never by rebuilding: removing a focused input commits
+  // whatever is half-typed in it, which would change a score on air. So a box on its way out
+  // is marked first, and its parting `change` is ignored.
+  function retire(input) {
+    input.dataset.gone = '1';
+    input.remove();
+  }
+  function addColumn(i) {
+    var grid = $('grid'), h = el('span', 'head');
+    h.dataset.head = i;
+    grid.insertBefore(h, $('total-head'));
+    [1, 2].forEach(function (t) {
+      var cell = numberBox('0');
+      cell.max = '99';
+      cell.dataset.team = t;
+      cell.dataset.col = i;
+      grid.insertBefore(cell, grid.querySelector('[data-total-of="' + t + '"]'));
+    });
+  }
+  function removeColumn(i) {
+    var grid = $('grid');
+    grid.querySelector('[data-head="' + i + '"]').remove();
+    grid.querySelectorAll('input[data-col="' + i + '"]').forEach(retire);
+  }
 
   function renderGrid() {
     var grid = $('grid'), n = S.columns.length;
-    if (n !== gridColumns) {
-      gridColumns = n;
-      grid.textContent = '';
-      grid.style.gridTemplateColumns = 'minmax(72px,1fr) repeat(' + n + ',minmax(38px,44px)) 44px';
-      grid.appendChild(document.createElement('span'));
-      S.columns.forEach(function (c, i) {
-        var h = document.createElement('span');
-        h.className = 'head';
-        h.dataset.head = i;
-        grid.appendChild(h);
-      });
-      var total = document.createElement('span');
-      total.className = 'head';
-      total.id = 'total-head';
-      grid.appendChild(total);
+    if (!gridBuilt) {
+      gridBuilt = true;
+      grid.appendChild(el('span'));
+      var totalHead = el('span', 'head');
+      totalHead.id = 'total-head';
+      grid.appendChild(totalHead);
       [1, 2].forEach(function (t) {
-        var name = document.createElement('span');
-        name.className = 'name';
+        var name = el('span', 'name'), sum = el('span', 'total');
         name.dataset.nameOf = t;
-        grid.appendChild(name);
-        S.columns.forEach(function (c, i) {
-          var cell = document.createElement('input');
-          cell.type = 'number';
-          cell.min = '0';
-          cell.max = '99';
-          cell.dataset.team = t;
-          cell.dataset.col = i;
-          grid.appendChild(cell);
-        });
-        var sum = document.createElement('span');
-        sum.className = 'total';
         sum.dataset.totalOf = t;
+        grid.appendChild(name);
         grid.appendChild(sum);
       });
     }
+    while (gridColumns < n) addColumn(gridColumns++);
+    while (gridColumns > n) removeColumn(--gridColumns);
+    grid.style.gridTemplateColumns = 'minmax(72px,1fr) repeat(' + n + ',minmax(38px,44px)) 44px';
     S.columns.forEach(function (c, i) {
       var h = grid.querySelector('[data-head="' + i + '"]');
       h.textContent = c.label;
@@ -329,29 +360,29 @@
     $('extra').classList.toggle('on', set.extraOn);
     var row = $('worth-row');
     row.hidden = !fixed;
-    if (fixed && set.innings !== worthInnings) {
-      worthInnings = set.innings;
-      row.textContent = '';
-      var points = document.createElement('label');
+    if (fixed && !row.children.length) {
+      var points = el('label');
       points.textContent = 'Points';
-      row.appendChild(points);
-      for (var i = 0; i < set.innings; i++) {
-        var box = document.createElement('input');
-        box.type = 'number';
-        box.min = '0';
-        box.dataset.worth = i;
-        box.setAttribute('aria-label', 'Points for inning ' + (i + 1));
-        row.appendChild(box);
-      }
-      var extra = document.createElement('label');
+      var extra = el('label');
+      extra.id = 'worth-extra';
       extra.textContent = 'Extra';
-      row.appendChild(extra);
-      var xBox = document.createElement('input');
-      xBox.type = 'number';
-      xBox.min = '0';
+      var xBox = numberBox('0');
       xBox.dataset.worth = 'x';
       xBox.setAttribute('aria-label', "Extra's points");
+      row.appendChild(points);
+      row.appendChild(extra);
       row.appendChild(xBox);
+    }
+    while (fixed && worthBoxes < set.innings) {
+      var box = numberBox('0');
+      box.dataset.worth = worthBoxes;
+      box.setAttribute('aria-label', 'Points for inning ' + (worthBoxes + 1));
+      row.insertBefore(box, $('worth-extra'));
+      worthBoxes++;
+    }
+    while (fixed && worthBoxes > set.innings) {
+      worthBoxes--;
+      retire(row.querySelector('[data-worth="' + worthBoxes + '"]'));
     }
     if (fixed) {
       for (var k = 0; k < set.innings; k++) reflect(row.querySelector('[data-worth="' + k + '"]'), worthOf(k));
@@ -408,6 +439,7 @@
   function setStatus(on, text) {
     $('status').classList.toggle('on', on);
     $('status').textContent = text;
+    document.querySelectorAll('button').forEach(function (b) { b.disabled = !on; });
   }
 
   function connect() {
@@ -441,7 +473,7 @@
       }
     };
     ws.onclose = function () {
-      // Don't replay clicks into a later connection: the operator has moved on by then.
+      // Whatever hadn't gone yet stays gone: the operator has moved on by the time it's back.
       queue.length = 0;
       inFlight = false;
       clearTimeout(flightTimer);
@@ -449,6 +481,7 @@
       setTimeout(connect, RECONNECT_MS);
     };
   }
+  setStatus(false, 'connecting…');
   connect();
 })();
 </script>

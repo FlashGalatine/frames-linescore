@@ -54,7 +54,7 @@ Everything runs through the one parametric `Linescore Command` action. In chat, 
 | `command` | `value` | Effect |
 |---|---|---|
 | `t1win` `t2win` | none | Fixed points: that team wins the live inning and gets its points, the other team gets 0, and the live inning moves on |
-| `undo` | none | Takes back the last scoring change, up to 20 steps |
+| `undo` | none | Takes back the last scoring change, up to 20 steps. That includes `reset` and `preset`, which bring the old scores back, though not the old format |
 | `t1` `t2` | `3 20` | Sets that team's inning 3 to 20. `3 -` clears the cell. Any number from 0 to 99 |
 | `t1+` `t1-` `t2+` `t2-` | none | One point up or down in the live inning |
 | `next` | none | Free entry: moves the live inning on, writing 0 into any blank cell |
@@ -65,7 +65,7 @@ Everything runs through the one parametric `Linescore Command` action. In chat, 
 | `extra` | `on` or `off` | Whether a tie adds another inning. With it off, a tie stands as a draw |
 | `ball` `strike` `out` | `2`, `on`, `off`, `name Games` | Sets a count, shows or hides it, or renames it. Commands keep using the original word |
 | `title` `collabel` `extralabel` `totallabel` | text | The board's title, the column prefix (`SET` gives SET 1), the extra's label and the total's label |
-| `preset` | `sfl` or `baseball` | Applies a format, below. It clears the scores and keeps the team names |
+| `preset` | `sfl` or `baseball` | Applies a format, below. It clears the scores, keeps the team names, and shows the board if it was hidden |
 | `reset` | none | A new match: clears the scores and the counts' values. Names, format and labels stay |
 | `hide` `show` | none | Hides or shows the board |
 
@@ -77,7 +77,7 @@ A rejected command changes nothing and logs a warning in **Streamer.bot → Logs
 
 **Stream Deck / hotkeys.** Make a wrapper action per button: *Set Argument* `command` = `t1win` → *Run Action* `Linescore Command`, and bind the key to the wrapper.
 
-**Two moderators at once.** A `t1win` or `t2win` from chat is ignored if another win landed in the last 5 seconds, so two people typing the same result can't award two sets. To catch up from chat, wait out the 5 seconds or set the cell directly with `t1 2 10`. The panel isn't held to this.
+**Two people at once.** A `t1win` or `t2win` from chat is ignored if another win landed in the last 30 seconds, so two people typing the same result can't award two sets. Stream delay plus typing can put them that far apart, and a set takes minutes. `undo` and `next` work the same way, each against its own last use. To catch up from chat, set the cell directly with `t1 2 10`; an `undo` also clears the guard for the next result. A panel click is held to this only when the last one came from chat, so someone at the dock can't double up a moderator's result, while the panel's own clicks still land in order.
 
 ## Two ways to score
 
@@ -105,8 +105,10 @@ Open **`http://127.0.0.1:7474/frames-shared/control.html`** in a browser tab, or
 
 - **It works on the streaming PC only.** Moderators and TOs elsewhere use chat.
 - Edited but unsaved fields survive live updates. **Any Set click applies every edited field at once.**
-- A double-click on a winner button counts once. Clicks on different buttons queue up and land in order.
-- New match, and a preset when scores exist, take a second click, in case you hit them by accident on air.
+- A double-click on any button counts once. Clicks on different buttons queue up and land in order.
+- New match, and a preset when scores exist, take a second, separate click, in case you hit them by accident on air. Undo brings the scores back if you still meant not to.
+- The buttons are disabled while the connection is down, and nothing clicked then is replayed when it comes back. Text you typed stays until you can Set it.
+- A half-typed cell stays half-typed when a result arrives from chat, even one that adds a column.
 
 ## Make it yours
 
@@ -154,10 +156,10 @@ The actions in `actions/` are generated: edit `actions/src`, then run `node tool
 ## Troubleshooting
 
 - **Chat command does nothing:** the command isn't a **trigger** on `Linescore Command`, or its text doesn't match what you type. Streamer.bot → Logs shows `[Linescore Command] token='…'` for every hit, and `ignored: …` with the reason when a command is refused.
-- **`!ls t1win` was ignored:** the board is in free entry, the match is over, or another win landed under 5 seconds ago. Logs says which.
+- **`!ls t1win` was ignored:** the board is in free entry, the match is over, or another win landed under 30 seconds ago. Logs says which.
 - **A viewer could change the board:** `!ls` isn't set to Moderators. See step 5.
 - **Panels blank:** state never arrived. Check the WebSocket Server is on `:8080` with authentication off (or that the URL carries a matching `?sbport=`), and that the action is named exactly `Linescore Push` and **compiles**. A compile error broadcasts nothing. On a runtime failure, the action broadcasts `{ type: 'linescore:error', message }`.
-- **The board stayed hidden:** someone ran `hide`, and it survives New match. Run `!ls show`.
+- **The board stayed hidden:** someone ran `hide`, which survives New match and a restart. Run `!ls show`, or any `preset`.
 - **`npm start` fails with `EADDRINUSE`:** real Streamer.bot already owns the ports. Relocate the mock with `SB_HTTP_PORT=7480 SB_WS_PORT=8090 npm start`, or just use Streamer.bot.
 
 ## Author & support

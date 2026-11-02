@@ -8,7 +8,7 @@
 export const MAX_COLUMNS = 12;
 export const CELL_MAX = 99;
 export const UNDO_MAX = 20;
-export const CHAT_WIN_GUARD_MS = 5000;
+export const CHAT_GUARD_MS = 30000;
 
 const LABEL_KEYS = ['ball', 'strike', 'out'];
 const LABEL_NAMES = { ball: 'Ball', strike: 'Strike', out: 'Out' };
@@ -191,8 +191,30 @@ function clearScores(state) {
   state['ls.t1scores'] = '';
   state['ls.t2scores'] = '';
   state['ls.live'] = '0';
-  state['ls.undo'] = '';
-  state['ls.lastwin'] = '';
+  for (const key of ['win', 'undo', 'next']) clearGuard(state, key);
+}
+
+const nowOf = (args) => (args._now !== undefined ? Number(args._now) : Date.now());
+
+// Two people typing the same thing, or a panel click on top of a chat command, must not
+// count twice: stream delay plus typing puts them seconds apart. Only panel-after-panel is
+// free, because the panel handles its own double-clicks and a burst there is deliberate.
+function refused(state, key, args) {
+  const last = parseMillis(get(state, `ls.last${key}`, ''));
+  if (last === null) return false;
+  const since = nowOf(args) - last;
+  if (since < 0 || since >= CHAT_GUARD_MS) return false;
+  return !(args.source === 'panel' && get(state, `ls.last${key}from`, '') === 'panel');
+}
+
+function stamp(state, key, args) {
+  state[`ls.last${key}`] = String(nowOf(args));
+  state[`ls.last${key}from`] = args.source === 'panel' ? 'panel' : 'chat';
+}
+
+function clearGuard(state, key) {
+  state[`ls.last${key}`] = '';
+  state[`ls.last${key}from`] = '';
 }
 
 function resetLabelValues(state) {
@@ -210,6 +232,7 @@ function applyPreset(state, which) {
   state['ls.extralabel'] = sfl ? 'EXTRA' : '';
   state['ls.totallabel'] = sfl ? 'TOTAL' : 'R';
   state['ls.title'] = sfl ? 'TEAM BATTLE' : '';
+  state['ls.hidden'] = '0'; // setting up a format means the board is wanted, even if last night ended on hide
   for (const key of LABEL_KEYS) {
     state[`ls.${key}.on`] = sfl ? '0' : '1';
     state[`ls.${key}.name`] = LABEL_NAMES[key];
@@ -240,14 +263,12 @@ function run(state, token, value, args, d) {
   const win = /^t([12])win$/.exec(token);
   if (win) {
     if (!d.fixed || d.live === null) return REJECT;
-    const nowMs = args._now !== undefined ? Number(args._now) : Date.now();
-    const last = parseMillis(get(state, 'ls.lastwin', ''));
-    if (args.source !== 'panel' && last !== null && nowMs - last >= 0 && nowMs - last < CHAT_WIN_GUARD_MS) return REJECT;
+    if (refused(state, 'win', args)) return REJECT;
     const winner = Number(win[1]) - 1;
+    stamp(state, 'win', args);
     return scoring(() => {
       setCell(state, winner, d.live, columnWorth(d, d.live));
       setCell(state, 1 - winner, d.live, 0);
-      state['ls.lastwin'] = String(nowMs);
     });
   }
 
@@ -289,17 +310,20 @@ function run(state, token, value, args, d) {
   switch (token) {
     case 'undo': {
       const lines = String(get(state, 'ls.undo', '')).split('\n').filter((l) => l.split('|').length === 3);
-      if (!lines.length) return REJECT;
+      if (!lines.length || refused(state, 'undo', args)) return REJECT;
       const [t1, t2, live] = lines.pop().split('|');
       state['ls.t1scores'] = t1;
       state['ls.t2scores'] = t2;
       state['ls.live'] = live;
       state['ls.undo'] = lines.join('\n');
-      state['ls.lastwin'] = '';
+      clearGuard(state, 'win'); // the correction comes straight after
+      clearGuard(state, 'next');
+      stamp(state, 'undo', args);
       return { ok: true, warn: false };
     }
     case 'next':
-      if (d.fixed || d.live === null) return REJECT;
+      if (d.fixed || d.live === null || refused(state, 'next', args)) return REJECT;
+      stamp(state, 'next', args);
       return scoring(() => {
         if (d.cell(0, d.live) === null) setCell(state, 0, d.live, 0);
         if (d.cell(1, d.live) === null) setCell(state, 1, d.live, 0);
@@ -348,13 +372,13 @@ function run(state, token, value, args, d) {
     case 'preset': {
       const which = value.toLowerCase();
       if (which !== 'sfl' && which !== 'baseball') return REJECT;
-      applyPreset(state, which);
-      return { ok: true, warn: false };
+      return scoring(() => applyPreset(state, which));
     }
     case 'reset':
-      clearScores(state);
-      resetLabelValues(state);
-      return { ok: true, warn: false };
+      return scoring(() => {
+        clearScores(state);
+        resetLabelValues(state);
+      });
     case 'hide': state['ls.hidden'] = '1'; return { ok: true, warn: false };
     case 'show': state['ls.hidden'] = '0'; return { ok: true, warn: false };
     case 'setmany': {

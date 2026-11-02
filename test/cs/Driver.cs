@@ -2,7 +2,9 @@
 // Every text field is base64 UTF-8, so tabs, newlines and emoji survive the pipe.
 //   RESET                     a new, empty world
 //   SEED  key  value          sets a global variable
+//   SEEDINT key value         sets a global variable to a number, not a string
 //   THROW 1|0                 makes GetGlobalVar throw (or stop throwing)
+//   FAILBROADCAST             makes the next broadcast throw
 //   PUSH                      runs Linescore Push
 //   RUN   name:value ...       runs Linescore Command with those args
 // After PUSH and RUN it prints: P  <payload>  <warn count>  <Execute's result>
@@ -27,7 +29,9 @@ public static class Driver
             {
                 case "RESET": World.Cph = new FakeCph(); break;
                 case "SEED": cph.Globals[Unb64(f[1])] = Unb64(f[2]); break;
+                case "SEEDINT": cph.Globals[Unb64(f[1])] = int.Parse(Unb64(f[2])); break;
                 case "THROW": cph.ThrowOnGet = f[1] == "1"; break;
+                case "FAILBROADCAST": cph.ThrowOnNextBroadcast = true; break;
                 case "PUSH":
                 {
                     cph.Warns = 0;

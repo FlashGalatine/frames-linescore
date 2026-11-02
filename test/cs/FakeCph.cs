@@ -6,12 +6,13 @@ using System.Globalization;
 
 public class FakeCph
 {
-    public Dictionary<string, string> Globals = new Dictionary<string, string>();
+    public Dictionary<string, object> Globals = new Dictionary<string, object>();
     public Dictionary<string, string> Args = new Dictionary<string, string>();
     public string LastBroadcast;
     public int Broadcasts;
     public int Warns;
     public bool ThrowOnGet;
+    public bool ThrowOnNextBroadcast;
 
     public bool TryGetArg<T>(string key, out T value)
     {
@@ -24,8 +25,9 @@ public class FakeCph
     public T GetGlobalVar<T>(string key, bool persisted)
     {
         if (ThrowOnGet) throw new InvalidOperationException("forced failure");
-        string v;
-        if (Globals.TryGetValue(key, out v)) return (T)(object)v;
+        object v;
+        // A cast, as a stored number read as a string may well fail in Streamer.bot.
+        if (Globals.TryGetValue(key, out v)) return (T)v;
         return default(T);
     }
 
@@ -40,7 +42,12 @@ public class FakeCph
         return new Push.CPHInline().Execute();
     }
 
-    public void WebsocketBroadcastJson(string json) { LastBroadcast = json; Broadcasts++; }
+    public void WebsocketBroadcastJson(string json)
+    {
+        if (ThrowOnNextBroadcast) { ThrowOnNextBroadcast = false; throw new InvalidOperationException("forced failure"); }
+        LastBroadcast = json;
+        Broadcasts++;
+    }
     public void LogInfo(string message) { }
     public void LogWarn(string message) { Warns++; }
 }

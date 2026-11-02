@@ -242,11 +242,24 @@ public class CPHInline
     }
 
     // GetGlobalVar returns null when unset: fall back to the default, but keep an
-    // explicitly-set empty string.
+    // explicitly-set empty string. A variable hand-edited to a non-string must not stop the
+    // board, so a failed read tries it as an object, then falls back too.
     string Var(string key, string dflt)
     {
-        var v = CPH.GetGlobalVar<string>(key, true);
-        return v == null ? dflt : v;
+        try
+        {
+            var v = CPH.GetGlobalVar<string>(key, true);
+            return v == null ? dflt : v;
+        }
+        catch (Exception)
+        {
+            try
+            {
+                var o = CPH.GetGlobalVar<object>(key, true);
+                return o == null ? dflt : Convert.ToString(o, CultureInfo.InvariantCulture);
+            }
+            catch (Exception) { return dflt; }
+        }
     }
 
     static bool TryInt(string s, out int n)

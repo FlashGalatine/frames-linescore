@@ -1,232 +1,1892 @@
 [
-  { "name": "sfl-full-run", "steps": [
-    { "cmd": "preset", "value": "sfl", "columns": 3, "live": 0, "expect": { "title": "TEAM BATTLE", "totalLabel": "TOTAL", "mode": "fixed",
-        "columns": [{ "label": "SET 1", "worth": 10, "state": "live", "extra": false }, { "label": "SET 2", "worth": 10, "state": "open" }, { "label": "SET 3", "worth": 20, "state": "open" }],
-        "labels": [{ "key": "ball", "on": false }, { "key": "strike", "on": false }, { "key": "out", "on": false }] } },
-    { "cmd": "t1name", "value": "Team East Coast" },
-    { "cmd": "t1win", "now": 0, "live": 1, "expect": { "teams": [{ "name": "Team East Coast", "scores": [10, null, null], "total": 10 }, { "scores": [0, null, null], "total": 0 }], "lead": 0 } },
-    { "cmd": "t1win", "now": 10000, "live": 2 },
-    { "cmd": "t2win", "now": 20000, "columns": 4, "live": 3, "expect": { "lead": null, "over": false, "teams": [{ "total": 20 }, { "total": 20 }],
-        "columns": [{ "state": "done" }, { "state": "done" }, { "state": "done" }, { "label": "EXTRA", "worth": 5, "state": "live", "extra": true }] } },
-    { "cmd": "t1win", "now": 30000, "columns": 4, "live": null, "expect": { "lead": 0, "over": true, "teams": [{ "total": 25, "scores": [10, 10, 0, 5] }, { "total": 20, "scores": [0, 0, 20, 0] }] } },
-    { "cmd": "t1win", "now": 40000, "warn": true, "unchanged": true }
-  ] },
-
-  { "name": "fresh-install", "steps": [
-    { "columns": 9, "live": 0, "expect": { "type": "linescore:update", "title": "", "totalLabel": "R", "mode": "free", "hidden": false, "lead": null, "over": false,
-        "teams": [{ "name": "Visitor", "scores": [null, null, null, null, null, null, null, null, null], "total": 0 }, { "name": "Home", "total": 0 }],
-        "columns": [{ "label": "1", "worth": null, "state": "live" }, { "label": "2", "state": "open" }, { "label": "3" }, { "label": "4" }, { "label": "5" }, { "label": "6" }, { "label": "7" }, { "label": "8" }, { "label": "9", "extra": false }],
-        "labels": [{ "key": "ball", "name": "Ball", "value": 0, "on": true }, { "key": "strike", "name": "Strike", "value": 0, "on": true }, { "key": "out", "name": "Out", "value": 0, "on": true }] } }
-  ] },
-
-  { "name": "preset-baseball", "steps": [
-    { "cmd": "preset", "value": "sfl" },
-    { "cmd": "t1name", "value": "East" },
-    { "cmd": "t1win", "source": "panel" },
-    { "cmd": "preset", "value": "baseball", "columns": 9, "live": 0, "expect": { "mode": "free", "title": "", "totalLabel": "R",
-        "teams": [{ "name": "East", "scores": [null], "total": 0 }], "columns": [{ "label": "1", "worth": null }],
-        "labels": [{ "name": "Ball", "on": true }, { "name": "Strike", "on": true }, { "name": "Out", "on": true }] } }
-  ] },
-
-  { "name": "undo-steps", "steps": [
-    { "cmd": "preset", "value": "sfl" },
-    { "cmd": "t1win", "source": "panel" },
-    { "cmd": "t1win", "source": "panel" },
-    { "cmd": "t2win", "source": "panel", "columns": 4 },
-    { "cmd": "undo", "columns": 3, "live": 2, "expect": { "teams": [{ "scores": [10, 10, null], "total": 20 }, { "scores": [0, 0, null], "total": 0 }], "columns": [{}, {}, { "label": "SET 3" }] } },
-    { "cmd": "undo", "live": 1 },
-    { "cmd": "undo", "live": 0, "expect": { "teams": [{ "scores": [null, null, null], "total": 0 }, { "total": 0 }] } },
-    { "cmd": "undo", "warn": true, "unchanged": true }
-  ] },
-
-  { "name": "worth-command", "steps": [
-    { "cmd": "worth", "value": "10 10 20 x5", "columns": 3, "live": 0, "expect": { "mode": "fixed", "columns": [{ "worth": 10 }, { "worth": 10 }, { "worth": 20 }],
-        "settings": { "innings": 3, "worth": [10, 10, 20], "extraWorth": 5, "extraOn": true, "colLabel": "", "extraLabel": "" } } },
-    { "cmd": "t1win", "source": "panel" },
-    { "cmd": "t1win", "source": "panel" },
-    { "cmd": "t2win", "source": "panel", "columns": 4, "expect": { "columns": [{}, {}, {}, { "worth": 5 }] } }
-  ] },
-
-  { "name": "win-in-free", "steps": [
-    { "cmd": "t1win", "source": "panel", "warn": true, "unchanged": true }
-  ] },
-
-  { "name": "free-both-score", "steps": [
-    { "cmd": "t1", "value": "1 2" },
-    { "cmd": "t2", "value": "1 3", "live": 0, "expect": { "teams": [{ "scores": [2], "total": 2 }, { "scores": [3], "total": 3 }], "lead": 1 } }
-  ] },
-
-  { "name": "next-fills-zero", "steps": [
-    { "cmd": "t1+" },
-    { "cmd": "next", "live": 1, "expect": { "teams": [{ "scores": [1] }, { "scores": [0] }] } },
-    { "cmd": "preset", "value": "sfl" },
-    { "cmd": "next", "warn": true, "unchanged": true }
-  ] },
-
-  { "name": "free-tie-adds", "steps": [
-    { "cmd": "innings", "value": "1", "columns": 1 },
-    { "cmd": "t1", "value": "1 2" },
-    { "cmd": "t2", "value": "1 2", "columns": 2, "expect": { "over": false, "lead": null, "columns": [{ "label": "1", "extra": false }, { "label": "2", "extra": true, "worth": null }] } },
-    { "cmd": "t1", "value": "2 1" },
-    { "cmd": "t2", "value": "2 0", "columns": 2, "live": null, "expect": { "over": true, "lead": 0, "teams": [{ "total": 3 }, { "total": 2 }] } }
-  ] },
-
-  { "name": "free-next-through-a-tie", "steps": [
-    { "cmd": "innings", "value": "1" },
-    { "cmd": "t1+" },
-    { "cmd": "t2+" },
-    { "cmd": "next", "columns": 2, "live": 1 },
-    { "cmd": "t1+" },
-    { "cmd": "next", "columns": 2, "live": null, "expect": { "over": true, "lead": 0, "teams": [{ "scores": [1, 1] }, { "scores": [1, 0] }] } },
-    { "cmd": "next", "warn": true, "unchanged": true },
-    { "cmd": "t1+", "warn": true, "unchanged": true }
-  ] },
-
-  { "name": "extra-off-draw", "steps": [
-    { "cmd": "preset", "value": "sfl" },
-    { "cmd": "extra", "value": "off", "expect": { "settings": { "extraOn": false, "colLabel": "SET", "extraLabel": "EXTRA", "innings": 3 } } },
-    { "cmd": "t1win", "source": "panel" },
-    { "cmd": "t1win", "source": "panel" },
-    { "cmd": "t2win", "source": "panel", "columns": 3, "live": null, "expect": { "over": true, "lead": null, "teams": [{ "total": 20 }, { "total": 20 }] } },
-    { "cmd": "t1win", "source": "panel", "warn": true, "unchanged": true },
-    { "cmd": "extra", "value": "on", "columns": 4, "live": 3, "expect": { "over": false } },
-    { "cmd": "extra", "value": "maybe", "warn": true, "unchanged": true }
-  ] },
-
-  { "name": "cap", "steps": [
-    { "cmd": "innings", "value": "13", "columns": 12 },
-    { "cmd": "t1", "value": "1 1" }, { "cmd": "t2", "value": "1 1" },
-    { "cmd": "t1", "value": "2 1" }, { "cmd": "t2", "value": "2 1" },
-    { "cmd": "t1", "value": "3 1" }, { "cmd": "t2", "value": "3 1" },
-    { "cmd": "t1", "value": "4 1" }, { "cmd": "t2", "value": "4 1" },
-    { "cmd": "t1", "value": "5 1" }, { "cmd": "t2", "value": "5 1" },
-    { "cmd": "t1", "value": "6 1" }, { "cmd": "t2", "value": "6 1" },
-    { "cmd": "t1", "value": "7 1" }, { "cmd": "t2", "value": "7 1" },
-    { "cmd": "t1", "value": "8 1" }, { "cmd": "t2", "value": "8 1" },
-    { "cmd": "t1", "value": "9 1" }, { "cmd": "t2", "value": "9 1" },
-    { "cmd": "t1", "value": "10 1" }, { "cmd": "t2", "value": "10 1" },
-    { "cmd": "t1", "value": "11 1" }, { "cmd": "t2", "value": "11 1", "warn": false },
-    { "cmd": "t1", "value": "12 1", "warn": false },
-    { "cmd": "t2", "value": "12 1", "warn": true, "columns": 12, "live": null, "expect": { "over": true, "lead": null } },
-    { "cmd": "t1", "value": "13 5", "warn": true, "unchanged": true }
-  ] },
-
-  { "name": "innings-keeps-recorded", "steps": [
-    { "cmd": "innings", "value": "9" },
-    { "cmd": "t1", "value": "5 1" },
-    { "cmd": "innings", "value": "3", "columns": 5 }
-  ] },
-
-  { "name": "one-team-cell", "steps": [
-    { "cmd": "preset", "value": "sfl" },
-    { "cmd": "t1", "value": "1 10", "live": 0, "expect": { "columns": [{ "state": "live" }], "teams": [{ "scores": [10], "total": 10 }, { "scores": [null], "total": 0 }] } },
-    { "cmd": "t2", "value": "2 10", "live": 0, "expect": { "columns": [{}, { "state": "open" }] } }
-  ] },
-
-  { "name": "corrections", "steps": [
-    { "cmd": "preset", "value": "sfl" },
-    { "cmd": "t1win", "source": "panel", "live": 1 },
-    { "cmd": "t1", "value": "1 20", "expect": { "teams": [{ "total": 20 }] } },
-    { "cmd": "t1", "value": "1 -", "live": 0, "expect": { "teams": [{ "scores": [null], "total": 0 }, { "scores": [0] }] } }
-  ] },
-
-  { "name": "clamps", "steps": [
-    { "cmd": "t1", "value": "1 150", "expect": { "teams": [{ "scores": [99] }] } },
-    { "cmd": "t1+", "expect": { "teams": [{ "scores": [99] }] } },
-    { "cmd": "t2-", "expect": { "teams": [{}, { "scores": [0] }] } }
-  ] },
-
-  { "name": "format-change-keeps-cells", "steps": [
-    { "cmd": "preset", "value": "sfl" },
-    { "cmd": "t1win", "source": "panel" },
-    { "cmd": "worth", "value": "5 5 5 x1", "expect": { "teams": [{ "scores": [10, null, null] }, { "scores": [0] }], "columns": [{}, { "worth": 5 }] } },
-    { "cmd": "free", "expect": { "mode": "free", "teams": [{ "scores": [10] }], "columns": [{ "worth": null }, { "worth": null }] } }
-  ] },
-
-  { "name": "innings-beyond-worth", "steps": [
-    { "cmd": "worth", "value": "10 10 x5", "columns": 2 },
-    { "cmd": "innings", "value": "4", "warn": true, "columns": 4, "expect": { "columns": [{ "worth": 10 }, { "worth": 10 }, { "worth": 5 }, { "worth": 5 }] } }
-  ] },
-
-  { "name": "reset-keeps-format", "steps": [
-    { "cmd": "preset", "value": "sfl" },
-    { "cmd": "t1name", "value": "East" },
-    { "cmd": "ball", "value": "3" },
-    { "cmd": "ball", "value": "name Games" },
-    { "cmd": "t1win", "source": "panel" },
-    { "cmd": "reset", "columns": 3, "live": 0, "expect": { "mode": "fixed", "title": "TEAM BATTLE", "teams": [{ "name": "East", "scores": [null], "total": 0 }, { "scores": [null] }],
-        "labels": [{ "name": "Games", "value": 0 }] } },
-    { "cmd": "undo", "warn": true, "unchanged": true }
-  ] },
-
-  { "name": "labels", "steps": [
-    { "cmd": "ball", "value": "2" },
-    { "cmd": "ball", "value": "off", "expect": { "labels": [{ "on": false, "value": 2 }] } },
-    { "cmd": "ball", "value": "name Games" },
-    { "cmd": "ball", "value": "on", "expect": { "labels": [{ "key": "ball", "name": "Games", "value": 2, "on": true }] } },
-    { "cmd": "ball", "value": "abc", "warn": true, "unchanged": true },
-    { "cmd": "ball", "value": "", "warn": true, "unchanged": true },
-    { "cmd": "ball", "value": "150", "expect": { "labels": [{ "value": 99 }] } },
-    { "cmd": "strike", "value": "1", "expect": { "labels": [{}, { "key": "strike", "value": 1 }] } },
-    { "cmd": "out", "value": "off", "expect": { "labels": [{}, {}, { "key": "out", "on": false }] } }
-  ] },
-
-  { "name": "display-labels", "steps": [
-    { "cmd": "collabel", "value": "GAME", "expect": { "columns": [{ "label": "GAME 1" }] } },
-    { "cmd": "title", "value": "Finals", "expect": { "title": "Finals" } },
-    { "cmd": "totallabel", "value": "PTS", "expect": { "totalLabel": "PTS" } },
-    { "cmd": "innings", "value": "1" },
-    { "cmd": "t1", "value": "1 1" },
-    { "cmd": "t2", "value": "1 1", "expect": { "columns": [{}, { "label": "2" }] } },
-    { "cmd": "extralabel", "value": "OT", "expect": { "columns": [{}, { "label": "OT" }] } },
-    { "cmd": "t1", "value": "2 1" },
-    { "cmd": "t2", "value": "2 1", "expect": { "columns": [{}, { "label": "OT" }, { "label": "OT 2" }] } }
-  ] },
-
-  { "name": "hide-show", "steps": [
-    { "cmd": "hide", "expect": { "hidden": true } },
-    { "cmd": "reset", "expect": { "hidden": true } },
-    { "cmd": "show", "expect": { "hidden": false } }
-  ] },
-
-  { "name": "setmany", "steps": [
-    { "cmd": "setmany", "args": { "t1name": "East", "t2name": "West", "ballname": "Games", "title": "Finals" }, "expect": { "title": "Finals", "teams": [{ "name": "East" }, { "name": "West" }], "labels": [{ "name": "Games" }] } },
-    { "cmd": "setmany", "warn": true, "unchanged": true }
-  ] },
-
-  { "name": "chat-double-win", "steps": [
-    { "cmd": "preset", "value": "sfl" },
-    { "cmd": "t1win", "now": 0, "live": 1 },
-    { "cmd": "t1win", "now": 2000, "warn": true, "unchanged": true },
-    { "cmd": "t2win", "now": 3000, "warn": true, "unchanged": true },
-    { "cmd": "t1win", "now": 6000, "live": 2, "expect": { "teams": [{ "scores": [10, 10] }] } },
-    { "cmd": "t2win", "now": 6100, "source": "panel", "columns": 4, "expect": { "teams": [{}, { "scores": [0, 0, 20] }] } }
-  ] },
-
-  { "name": "undo-clears-guard", "steps": [
-    { "cmd": "preset", "value": "sfl" },
-    { "cmd": "t1win", "now": 0 },
-    { "cmd": "undo", "now": 100 },
-    { "cmd": "t2win", "now": 200, "expect": { "teams": [{ "scores": [0] }, { "scores": [10] }] } }
-  ] },
-
-  { "name": "invalid-input", "steps": [
-    { "cmd": "t1", "value": "", "warn": true, "unchanged": true },
-    { "cmd": "t1", "value": "3", "warn": true, "unchanged": true },
-    { "cmd": "t1", "value": "abc 5", "warn": true, "unchanged": true },
-    { "cmd": "t1", "value": "1 abc", "warn": true, "unchanged": true },
-    { "cmd": "t1", "value": "0 5", "warn": true, "unchanged": true },
-    { "cmd": "t1", "value": "1 99999999999", "warn": true, "unchanged": true },
-    { "cmd": "t3win", "warn": true, "unchanged": true },
-    { "cmd": "innings", "value": "abc", "warn": true, "unchanged": true },
-    { "cmd": "worth", "value": "", "warn": true, "unchanged": true },
-    { "cmd": "worth", "value": "ten", "warn": true, "unchanged": true },
-    { "cmd": "preset", "value": "nope", "warn": true, "unchanged": true },
-    { "cmd": "nonsense", "warn": true, "unchanged": true }
-  ] },
-
-  { "name": "garbage-state", "seed": { "ls.innings": "abc", "ls.t1scores": "x,,7,,,", "ls.mode": "bogus", "ls.worth": "a,b", "ls.ball.value": "z", "ls.live": "nope", "ls.undo": "junk" }, "steps": [
-    { "columns": 9, "live": 0, "expect": { "mode": "free", "teams": [{ "scores": [null, null, 7, null], "total": 7 }, { "total": 0 }], "lead": 0, "labels": [{ "value": 0 }] } },
-    { "cmd": "t1", "value": "1 1", "warn": false, "expect": { "teams": [{ "scores": [1, null, 7], "total": 8 }] } }
-  ] }
+ {
+  "name": "sfl-full-run",
+  "steps": [
+   {
+    "cmd": "preset",
+    "value": "sfl",
+    "columns": 3,
+    "live": 0,
+    "expect": {
+     "title": "TEAM BATTLE",
+     "totalLabel": "TOTAL",
+     "mode": "fixed",
+     "columns": [
+      {
+       "label": "SET 1",
+       "worth": 10,
+       "state": "live",
+       "extra": false
+      },
+      {
+       "label": "SET 2",
+       "worth": 10,
+       "state": "open"
+      },
+      {
+       "label": "SET 3",
+       "worth": 20,
+       "state": "open"
+      }
+     ],
+     "labels": [
+      {
+       "key": "ball",
+       "on": false
+      },
+      {
+       "key": "strike",
+       "on": false
+      },
+      {
+       "key": "out",
+       "on": false
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "t1name",
+    "value": "Team East Coast"
+   },
+   {
+    "cmd": "t1win",
+    "now": 0,
+    "live": 1,
+    "expect": {
+     "teams": [
+      {
+       "name": "Team East Coast",
+       "scores": [
+        10,
+        null,
+        null
+       ],
+       "total": 10
+      },
+      {
+       "scores": [
+        0,
+        null,
+        null
+       ],
+       "total": 0
+      }
+     ],
+     "lead": 0
+    }
+   },
+   {
+    "cmd": "t1win",
+    "now": 160000,
+    "live": 2
+   },
+   {
+    "cmd": "t2win",
+    "now": 80000,
+    "columns": 4,
+    "live": 3,
+    "expect": {
+     "lead": null,
+     "over": false,
+     "teams": [
+      {
+       "total": 20
+      },
+      {
+       "total": 20
+      }
+     ],
+     "columns": [
+      {
+       "state": "done"
+      },
+      {
+       "state": "done"
+      },
+      {
+       "state": "done"
+      },
+      {
+       "label": "EXTRA",
+       "worth": 5,
+       "state": "live",
+       "extra": true
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "t1win",
+    "now": 120000,
+    "columns": 4,
+    "live": null,
+    "expect": {
+     "lead": 0,
+     "over": true,
+     "teams": [
+      {
+       "total": 25,
+       "scores": [
+        10,
+        10,
+        0,
+        5
+       ]
+      },
+      {
+       "total": 20,
+       "scores": [
+        0,
+        0,
+        20,
+        0
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "t1win",
+    "now": 40000,
+    "warn": true,
+    "unchanged": true
+   }
+  ]
+ },
+ {
+  "name": "fresh-install",
+  "steps": [
+   {
+    "columns": 9,
+    "live": 0,
+    "expect": {
+     "type": "linescore:update",
+     "title": "",
+     "totalLabel": "R",
+     "mode": "free",
+     "hidden": false,
+     "lead": null,
+     "over": false,
+     "teams": [
+      {
+       "name": "Visitor",
+       "scores": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+       ],
+       "total": 0
+      },
+      {
+       "name": "Home",
+       "total": 0
+      }
+     ],
+     "columns": [
+      {
+       "label": "1",
+       "worth": null,
+       "state": "live"
+      },
+      {
+       "label": "2",
+       "state": "open"
+      },
+      {
+       "label": "3"
+      },
+      {
+       "label": "4"
+      },
+      {
+       "label": "5"
+      },
+      {
+       "label": "6"
+      },
+      {
+       "label": "7"
+      },
+      {
+       "label": "8"
+      },
+      {
+       "label": "9",
+       "extra": false
+      }
+     ],
+     "labels": [
+      {
+       "key": "ball",
+       "name": "Ball",
+       "value": 0,
+       "on": true
+      },
+      {
+       "key": "strike",
+       "name": "Strike",
+       "value": 0,
+       "on": true
+      },
+      {
+       "key": "out",
+       "name": "Out",
+       "value": 0,
+       "on": true
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "preset-baseball",
+  "steps": [
+   {
+    "cmd": "preset",
+    "value": "sfl"
+   },
+   {
+    "cmd": "t1name",
+    "value": "East"
+   },
+   {
+    "cmd": "t1win",
+    "source": "panel"
+   },
+   {
+    "cmd": "preset",
+    "value": "baseball",
+    "columns": 9,
+    "live": 0,
+    "expect": {
+     "mode": "free",
+     "title": "",
+     "totalLabel": "R",
+     "teams": [
+      {
+       "name": "East",
+       "scores": [
+        null
+       ],
+       "total": 0
+      }
+     ],
+     "columns": [
+      {
+       "label": "1",
+       "worth": null
+      }
+     ],
+     "labels": [
+      {
+       "name": "Ball",
+       "on": true
+      },
+      {
+       "name": "Strike",
+       "on": true
+      },
+      {
+       "name": "Out",
+       "on": true
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "undo-steps",
+  "steps": [
+   {
+    "cmd": "preset",
+    "value": "sfl"
+   },
+   {
+    "cmd": "t1win",
+    "source": "panel"
+   },
+   {
+    "cmd": "t1win",
+    "source": "panel"
+   },
+   {
+    "cmd": "t2win",
+    "source": "panel",
+    "columns": 4
+   },
+   {
+    "cmd": "undo",
+    "columns": 3,
+    "live": 2,
+    "expect": {
+     "teams": [
+      {
+       "scores": [
+        10,
+        10,
+        null
+       ],
+       "total": 20
+      },
+      {
+       "scores": [
+        0,
+        0,
+        null
+       ],
+       "total": 0
+      }
+     ],
+     "columns": [
+      {},
+      {},
+      {
+       "label": "SET 3"
+      }
+     ]
+    },
+    "source": "panel"
+   },
+   {
+    "cmd": "undo",
+    "live": 1,
+    "source": "panel"
+   },
+   {
+    "cmd": "undo",
+    "live": 0,
+    "expect": {
+     "teams": [
+      {
+       "scores": [
+        null,
+        null,
+        null
+       ],
+       "total": 0
+      },
+      {
+       "total": 0
+      }
+     ]
+    },
+    "source": "panel"
+   },
+   {
+    "cmd": "undo",
+    "warn": true,
+    "unchanged": true,
+    "source": "panel"
+   }
+  ]
+ },
+ {
+  "name": "worth-command",
+  "steps": [
+   {
+    "cmd": "worth",
+    "value": "10 10 20 x5",
+    "columns": 3,
+    "live": 0,
+    "expect": {
+     "mode": "fixed",
+     "columns": [
+      {
+       "worth": 10
+      },
+      {
+       "worth": 10
+      },
+      {
+       "worth": 20
+      }
+     ],
+     "settings": {
+      "innings": 3,
+      "worth": [
+       10,
+       10,
+       20
+      ],
+      "extraWorth": 5,
+      "extraOn": true,
+      "colLabel": "",
+      "extraLabel": ""
+     }
+    }
+   },
+   {
+    "cmd": "t1win",
+    "source": "panel"
+   },
+   {
+    "cmd": "t1win",
+    "source": "panel"
+   },
+   {
+    "cmd": "t2win",
+    "source": "panel",
+    "columns": 4,
+    "expect": {
+     "columns": [
+      {},
+      {},
+      {},
+      {
+       "worth": 5
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "win-in-free",
+  "steps": [
+   {
+    "cmd": "t1win",
+    "source": "panel",
+    "warn": true,
+    "unchanged": true
+   }
+  ]
+ },
+ {
+  "name": "free-both-score",
+  "steps": [
+   {
+    "cmd": "t1",
+    "value": "1 2"
+   },
+   {
+    "cmd": "t2",
+    "value": "1 3",
+    "live": 0,
+    "expect": {
+     "teams": [
+      {
+       "scores": [
+        2
+       ],
+       "total": 2
+      },
+      {
+       "scores": [
+        3
+       ],
+       "total": 3
+      }
+     ],
+     "lead": 1
+    }
+   }
+  ]
+ },
+ {
+  "name": "next-fills-zero",
+  "steps": [
+   {
+    "cmd": "t1+"
+   },
+   {
+    "cmd": "next",
+    "live": 1,
+    "expect": {
+     "teams": [
+      {
+       "scores": [
+        1
+       ]
+      },
+      {
+       "scores": [
+        0
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "preset",
+    "value": "sfl"
+   },
+   {
+    "cmd": "next",
+    "warn": true,
+    "unchanged": true
+   }
+  ]
+ },
+ {
+  "name": "free-tie-adds",
+  "steps": [
+   {
+    "cmd": "innings",
+    "value": "1",
+    "columns": 1
+   },
+   {
+    "cmd": "t1",
+    "value": "1 2"
+   },
+   {
+    "cmd": "t2",
+    "value": "1 2",
+    "columns": 2,
+    "expect": {
+     "over": false,
+     "lead": null,
+     "columns": [
+      {
+       "label": "1",
+       "extra": false
+      },
+      {
+       "label": "2",
+       "extra": true,
+       "worth": null
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "t1",
+    "value": "2 1"
+   },
+   {
+    "cmd": "t2",
+    "value": "2 0",
+    "columns": 2,
+    "live": null,
+    "expect": {
+     "over": true,
+     "lead": 0,
+     "teams": [
+      {
+       "total": 3
+      },
+      {
+       "total": 2
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "free-next-through-a-tie",
+  "steps": [
+   {
+    "cmd": "innings",
+    "value": "1"
+   },
+   {
+    "cmd": "t1+"
+   },
+   {
+    "cmd": "t2+"
+   },
+   {
+    "cmd": "next",
+    "columns": 2,
+    "live": 1,
+    "source": "panel"
+   },
+   {
+    "cmd": "t1+"
+   },
+   {
+    "cmd": "next",
+    "columns": 2,
+    "live": null,
+    "expect": {
+     "over": true,
+     "lead": 0,
+     "teams": [
+      {
+       "scores": [
+        1,
+        1
+       ]
+      },
+      {
+       "scores": [
+        1,
+        0
+       ]
+      }
+     ]
+    },
+    "source": "panel"
+   },
+   {
+    "cmd": "next",
+    "warn": true,
+    "unchanged": true,
+    "source": "panel"
+   },
+   {
+    "cmd": "t1+",
+    "warn": true,
+    "unchanged": true
+   }
+  ]
+ },
+ {
+  "name": "extra-off-draw",
+  "steps": [
+   {
+    "cmd": "preset",
+    "value": "sfl"
+   },
+   {
+    "cmd": "extra",
+    "value": "off",
+    "expect": {
+     "settings": {
+      "extraOn": false,
+      "colLabel": "SET",
+      "extraLabel": "EXTRA",
+      "innings": 3
+     }
+    }
+   },
+   {
+    "cmd": "t1win",
+    "source": "panel"
+   },
+   {
+    "cmd": "t1win",
+    "source": "panel"
+   },
+   {
+    "cmd": "t2win",
+    "source": "panel",
+    "columns": 3,
+    "live": null,
+    "expect": {
+     "over": true,
+     "lead": null,
+     "teams": [
+      {
+       "total": 20
+      },
+      {
+       "total": 20
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "t1win",
+    "source": "panel",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "extra",
+    "value": "on",
+    "columns": 4,
+    "live": 3,
+    "expect": {
+     "over": false
+    }
+   },
+   {
+    "cmd": "extra",
+    "value": "maybe",
+    "warn": true,
+    "unchanged": true
+   }
+  ]
+ },
+ {
+  "name": "cap",
+  "steps": [
+   {
+    "cmd": "innings",
+    "value": "13",
+    "columns": 12
+   },
+   {
+    "cmd": "t1",
+    "value": "1 1"
+   },
+   {
+    "cmd": "t2",
+    "value": "1 1"
+   },
+   {
+    "cmd": "t1",
+    "value": "2 1"
+   },
+   {
+    "cmd": "t2",
+    "value": "2 1"
+   },
+   {
+    "cmd": "t1",
+    "value": "3 1"
+   },
+   {
+    "cmd": "t2",
+    "value": "3 1"
+   },
+   {
+    "cmd": "t1",
+    "value": "4 1"
+   },
+   {
+    "cmd": "t2",
+    "value": "4 1"
+   },
+   {
+    "cmd": "t1",
+    "value": "5 1"
+   },
+   {
+    "cmd": "t2",
+    "value": "5 1"
+   },
+   {
+    "cmd": "t1",
+    "value": "6 1"
+   },
+   {
+    "cmd": "t2",
+    "value": "6 1"
+   },
+   {
+    "cmd": "t1",
+    "value": "7 1"
+   },
+   {
+    "cmd": "t2",
+    "value": "7 1"
+   },
+   {
+    "cmd": "t1",
+    "value": "8 1"
+   },
+   {
+    "cmd": "t2",
+    "value": "8 1"
+   },
+   {
+    "cmd": "t1",
+    "value": "9 1"
+   },
+   {
+    "cmd": "t2",
+    "value": "9 1"
+   },
+   {
+    "cmd": "t1",
+    "value": "10 1"
+   },
+   {
+    "cmd": "t2",
+    "value": "10 1"
+   },
+   {
+    "cmd": "t1",
+    "value": "11 1"
+   },
+   {
+    "cmd": "t2",
+    "value": "11 1",
+    "warn": false
+   },
+   {
+    "cmd": "t1",
+    "value": "12 1",
+    "warn": false
+   },
+   {
+    "cmd": "t2",
+    "value": "12 1",
+    "warn": true,
+    "columns": 12,
+    "live": null,
+    "expect": {
+     "over": true,
+     "lead": null
+    }
+   },
+   {
+    "cmd": "t1",
+    "value": "13 5",
+    "warn": true,
+    "unchanged": true
+   }
+  ]
+ },
+ {
+  "name": "innings-keeps-recorded",
+  "steps": [
+   {
+    "cmd": "innings",
+    "value": "9"
+   },
+   {
+    "cmd": "t1",
+    "value": "5 1"
+   },
+   {
+    "cmd": "innings",
+    "value": "3",
+    "columns": 5
+   }
+  ]
+ },
+ {
+  "name": "one-team-cell",
+  "steps": [
+   {
+    "cmd": "preset",
+    "value": "sfl"
+   },
+   {
+    "cmd": "t1",
+    "value": "1 10",
+    "live": 0,
+    "expect": {
+     "columns": [
+      {
+       "state": "live"
+      }
+     ],
+     "teams": [
+      {
+       "scores": [
+        10
+       ],
+       "total": 10
+      },
+      {
+       "scores": [
+        null
+       ],
+       "total": 0
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "t2",
+    "value": "2 10",
+    "live": 0,
+    "expect": {
+     "columns": [
+      {},
+      {
+       "state": "open"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "corrections",
+  "steps": [
+   {
+    "cmd": "preset",
+    "value": "sfl"
+   },
+   {
+    "cmd": "t1win",
+    "source": "panel",
+    "live": 1
+   },
+   {
+    "cmd": "t1",
+    "value": "1 20",
+    "expect": {
+     "teams": [
+      {
+       "total": 20
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "t1",
+    "value": "1 -",
+    "live": 0,
+    "expect": {
+     "teams": [
+      {
+       "scores": [
+        null
+       ],
+       "total": 0
+      },
+      {
+       "scores": [
+        0
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "clamps",
+  "steps": [
+   {
+    "cmd": "t1",
+    "value": "1 150",
+    "expect": {
+     "teams": [
+      {
+       "scores": [
+        99
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "t1+",
+    "expect": {
+     "teams": [
+      {
+       "scores": [
+        99
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "t2-",
+    "expect": {
+     "teams": [
+      {},
+      {
+       "scores": [
+        0
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "format-change-keeps-cells",
+  "steps": [
+   {
+    "cmd": "preset",
+    "value": "sfl"
+   },
+   {
+    "cmd": "t1win",
+    "source": "panel"
+   },
+   {
+    "cmd": "worth",
+    "value": "5 5 5 x1",
+    "expect": {
+     "teams": [
+      {
+       "scores": [
+        10,
+        null,
+        null
+       ]
+      },
+      {
+       "scores": [
+        0
+       ]
+      }
+     ],
+     "columns": [
+      {},
+      {
+       "worth": 5
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "free",
+    "expect": {
+     "mode": "free",
+     "teams": [
+      {
+       "scores": [
+        10
+       ]
+      }
+     ],
+     "columns": [
+      {
+       "worth": null
+      },
+      {
+       "worth": null
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "innings-beyond-worth",
+  "steps": [
+   {
+    "cmd": "worth",
+    "value": "10 10 x5",
+    "columns": 2
+   },
+   {
+    "cmd": "innings",
+    "value": "4",
+    "warn": true,
+    "columns": 4,
+    "expect": {
+     "columns": [
+      {
+       "worth": 10
+      },
+      {
+       "worth": 10
+      },
+      {
+       "worth": 5
+      },
+      {
+       "worth": 5
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "reset-keeps-format",
+  "steps": [
+   {
+    "cmd": "preset",
+    "value": "sfl"
+   },
+   {
+    "cmd": "t1name",
+    "value": "East"
+   },
+   {
+    "cmd": "ball",
+    "value": "3"
+   },
+   {
+    "cmd": "ball",
+    "value": "name Games"
+   },
+   {
+    "cmd": "t1win",
+    "source": "panel"
+   },
+   {
+    "cmd": "reset",
+    "columns": 3,
+    "live": 0,
+    "expect": {
+     "mode": "fixed",
+     "title": "TEAM BATTLE",
+     "teams": [
+      {
+       "name": "East",
+       "scores": [
+        null
+       ],
+       "total": 0
+      },
+      {
+       "scores": [
+        null
+       ]
+      }
+     ],
+     "labels": [
+      {
+       "name": "Games",
+       "value": 0
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "undo",
+    "source": "panel",
+    "live": 1,
+    "expect": {
+     "teams": [
+      {
+       "name": "East",
+       "scores": [
+        10,
+        null,
+        null
+       ],
+       "total": 10
+      },
+      {
+       "scores": [
+        0
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "labels",
+  "steps": [
+   {
+    "cmd": "ball",
+    "value": "2"
+   },
+   {
+    "cmd": "ball",
+    "value": "off",
+    "expect": {
+     "labels": [
+      {
+       "on": false,
+       "value": 2
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "ball",
+    "value": "name Games"
+   },
+   {
+    "cmd": "ball",
+    "value": "on",
+    "expect": {
+     "labels": [
+      {
+       "key": "ball",
+       "name": "Games",
+       "value": 2,
+       "on": true
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "ball",
+    "value": "abc",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "ball",
+    "value": "",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "ball",
+    "value": "150",
+    "expect": {
+     "labels": [
+      {
+       "value": 99
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "strike",
+    "value": "1",
+    "expect": {
+     "labels": [
+      {},
+      {
+       "key": "strike",
+       "value": 1
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "out",
+    "value": "off",
+    "expect": {
+     "labels": [
+      {},
+      {},
+      {
+       "key": "out",
+       "on": false
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "display-labels",
+  "steps": [
+   {
+    "cmd": "collabel",
+    "value": "GAME",
+    "expect": {
+     "columns": [
+      {
+       "label": "GAME 1"
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "title",
+    "value": "Finals",
+    "expect": {
+     "title": "Finals"
+    }
+   },
+   {
+    "cmd": "totallabel",
+    "value": "PTS",
+    "expect": {
+     "totalLabel": "PTS"
+    }
+   },
+   {
+    "cmd": "innings",
+    "value": "1"
+   },
+   {
+    "cmd": "t1",
+    "value": "1 1"
+   },
+   {
+    "cmd": "t2",
+    "value": "1 1",
+    "expect": {
+     "columns": [
+      {},
+      {
+       "label": "2"
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "extralabel",
+    "value": "OT",
+    "expect": {
+     "columns": [
+      {},
+      {
+       "label": "OT"
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "t1",
+    "value": "2 1"
+   },
+   {
+    "cmd": "t2",
+    "value": "2 1",
+    "expect": {
+     "columns": [
+      {},
+      {
+       "label": "OT"
+      },
+      {
+       "label": "OT 2"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "hide-show",
+  "steps": [
+   {
+    "cmd": "hide",
+    "expect": {
+     "hidden": true
+    }
+   },
+   {
+    "cmd": "reset",
+    "expect": {
+     "hidden": true
+    }
+   },
+   {
+    "cmd": "show",
+    "expect": {
+     "hidden": false
+    }
+   },
+   {
+    "cmd": "hide",
+    "expect": {
+     "hidden": true
+    }
+   },
+   {
+    "cmd": "preset",
+    "value": "sfl",
+    "expect": {
+     "hidden": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "setmany",
+  "steps": [
+   {
+    "cmd": "setmany",
+    "args": {
+     "t1name": "East",
+     "t2name": "West",
+     "ballname": "Games",
+     "title": "Finals"
+    },
+    "expect": {
+     "title": "Finals",
+     "teams": [
+      {
+       "name": "East"
+      },
+      {
+       "name": "West"
+      }
+     ],
+     "labels": [
+      {
+       "name": "Games"
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "setmany",
+    "warn": true,
+    "unchanged": true
+   }
+  ]
+ },
+ {
+  "name": "chat-double-win",
+  "steps": [
+   {
+    "cmd": "preset",
+    "value": "sfl"
+   },
+   {
+    "cmd": "t1win",
+    "now": 0,
+    "live": 1
+   },
+   {
+    "cmd": "t1win",
+    "now": 2000,
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "t2win",
+    "now": 3000,
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "t1win",
+    "now": 29999,
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "t1win",
+    "now": 30000,
+    "live": 2,
+    "expect": {
+     "teams": [
+      {
+       "scores": [
+        10,
+        10
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "undo-clears-guard",
+  "steps": [
+   {
+    "cmd": "preset",
+    "value": "sfl"
+   },
+   {
+    "cmd": "t1win",
+    "now": 0
+   },
+   {
+    "cmd": "undo",
+    "now": 100
+   },
+   {
+    "cmd": "t2win",
+    "now": 200,
+    "expect": {
+     "teams": [
+      {
+       "scores": [
+        0
+       ]
+      },
+      {
+       "scores": [
+        10
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "invalid-input",
+  "steps": [
+   {
+    "cmd": "t1",
+    "value": "",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "t1",
+    "value": "3",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "t1",
+    "value": "abc 5",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "t1",
+    "value": "1 abc",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "t1",
+    "value": "0 5",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "t1",
+    "value": "1 99999999999",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "t3win",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "innings",
+    "value": "abc",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "worth",
+    "value": "",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "worth",
+    "value": "ten",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "preset",
+    "value": "nope",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "nonsense",
+    "warn": true,
+    "unchanged": true
+   }
+  ]
+ },
+ {
+  "name": "garbage-state",
+  "seed": {
+   "ls.innings": "abc",
+   "ls.t1scores": "x,,7,,,",
+   "ls.mode": "bogus",
+   "ls.worth": "a,b",
+   "ls.ball.value": "z",
+   "ls.live": "nope",
+   "ls.undo": "junk"
+  },
+  "steps": [
+   {
+    "columns": 9,
+    "live": 0,
+    "expect": {
+     "mode": "free",
+     "teams": [
+      {
+       "scores": [
+        null,
+        null,
+        7,
+        null
+       ],
+       "total": 7
+      },
+      {
+       "total": 0
+      }
+     ],
+     "lead": 0,
+     "labels": [
+      {
+       "value": 0
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "t1",
+    "value": "1 1",
+    "warn": false,
+    "expect": {
+     "teams": [
+      {
+       "scores": [
+        1,
+        null,
+        7
+       ],
+       "total": 8
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "panel-after-chat-win",
+  "steps": [
+   {
+    "cmd": "preset",
+    "value": "sfl"
+   },
+   {
+    "cmd": "t1win",
+    "now": 0,
+    "live": 1
+   },
+   {
+    "cmd": "t1win",
+    "now": 1000,
+    "source": "panel",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "t1win",
+    "now": 30000,
+    "source": "panel",
+    "live": 2
+   }
+  ]
+ },
+ {
+  "name": "panel-burst",
+  "steps": [
+   {
+    "cmd": "preset",
+    "value": "sfl"
+   },
+   {
+    "cmd": "t1win",
+    "now": 0,
+    "source": "panel"
+   },
+   {
+    "cmd": "t2win",
+    "now": 50,
+    "source": "panel"
+   },
+   {
+    "cmd": "t1win",
+    "now": 500,
+    "source": "panel",
+    "columns": 3,
+    "expect": {
+     "teams": [
+      {
+       "scores": [
+        10,
+        0,
+        20
+       ]
+      },
+      {
+       "scores": [
+        0,
+        10,
+        0
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "chat-after-panel-win",
+  "steps": [
+   {
+    "cmd": "preset",
+    "value": "sfl"
+   },
+   {
+    "cmd": "t1win",
+    "now": 0,
+    "source": "panel"
+   },
+   {
+    "cmd": "t2win",
+    "now": 1000,
+    "warn": true,
+    "unchanged": true
+   }
+  ]
+ },
+ {
+  "name": "chat-double-undo",
+  "steps": [
+   {
+    "cmd": "preset",
+    "value": "sfl"
+   },
+   {
+    "cmd": "t1win",
+    "source": "panel"
+   },
+   {
+    "cmd": "t1win",
+    "source": "panel"
+   },
+   {
+    "cmd": "t1win",
+    "source": "panel"
+   },
+   {
+    "cmd": "undo",
+    "now": 0,
+    "expect": {
+     "teams": [
+      {
+       "total": 20
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "undo",
+    "now": 1000,
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "undo",
+    "now": 1500,
+    "source": "panel",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "undo",
+    "now": 30000,
+    "expect": {
+     "teams": [
+      {
+       "total": 10
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "undo",
+    "now": 60000,
+    "source": "panel",
+    "expect": {
+     "teams": [
+      {
+       "total": 0
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "chat-double-next",
+  "steps": [
+   {
+    "cmd": "next",
+    "now": 0,
+    "live": 1
+   },
+   {
+    "cmd": "next",
+    "now": 1000,
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "next",
+    "now": 30000,
+    "live": 2
+   },
+   {
+    "cmd": "next",
+    "now": 30100,
+    "source": "panel",
+    "warn": true,
+    "unchanged": true
+   },
+   {
+    "cmd": "next",
+    "now": 60000,
+    "source": "panel",
+    "live": 3
+   },
+   {
+    "cmd": "next",
+    "now": 60100,
+    "source": "panel",
+    "live": 4
+   }
+  ]
+ },
+ {
+  "name": "undo-clears-the-next-guard",
+  "steps": [
+   {
+    "cmd": "next",
+    "now": 0,
+    "live": 1
+   },
+   {
+    "cmd": "undo",
+    "now": 100,
+    "live": 0
+   },
+   {
+    "cmd": "next",
+    "now": 200,
+    "live": 1
+   }
+  ]
+ },
+ {
+  "name": "preset-can-be-undone",
+  "steps": [
+   {
+    "cmd": "preset",
+    "value": "sfl"
+   },
+   {
+    "cmd": "t1win",
+    "source": "panel"
+   },
+   {
+    "cmd": "preset",
+    "value": "baseball",
+    "expect": {
+     "mode": "free",
+     "teams": [
+      {
+       "scores": [
+        null
+       ],
+       "total": 0
+      }
+     ]
+    }
+   },
+   {
+    "cmd": "undo",
+    "source": "panel",
+    "expect": {
+     "mode": "free",
+     "teams": [
+      {
+       "scores": [
+        10
+       ],
+       "total": 10
+      },
+      {
+       "scores": [
+        0
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "reset-with-nothing-to-clear",
+  "steps": [
+   {
+    "cmd": "reset"
+   },
+   {
+    "cmd": "undo",
+    "source": "panel",
+    "warn": true,
+    "unchanged": true
+   }
+  ]
+ }
 ]

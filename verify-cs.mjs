@@ -121,8 +121,17 @@ for (const name of ['Team "East" \\ Coast', 'Line\nBreak', 'Tab\there', 'NFC | P
   check(got === name, `JSON round trip: ${JSON.stringify(name)}`, JSON.stringify(got));
 }
 
-// 7. A failing push tells the overlays instead of going quiet.
-const failing = drive(['RESET', 'THROW\t1', 'PUSH', 'THROW\t0']);
+// 7. A hand-edited global can't stop the board: a number in a string variable still reads,
+//    and an unreadable one falls back to its default.
+const [typed] = drive(['RESET', `SEEDINT\t${b64('ls.innings')}\t${b64('5')}`, 'PUSH']);
+check(JSON.parse(typed.json).columns?.length === 5, 'a global stored as a number still reads', typed.json.slice(0, 120));
+const [typedCmd] = drive(['RESET', `SEEDINT\t${b64('ls.innings')}\t${b64('5')}`, run({ command: 't1', value: '1 7' })]);
+check(typedCmd.ok && JSON.parse(typedCmd.json).teams?.[0].scores[0] === 7, 'and a command still works alongside it', typedCmd.json.slice(0, 120));
+const [unreadable] = drive(['RESET', 'THROW\t1', 'PUSH']);
+check(JSON.parse(unreadable.json).columns?.length === 9 && unreadable.ok, 'an unreadable global falls back to its default', unreadable.json.slice(0, 120));
+
+// 8. A failing push tells the overlays instead of going quiet.
+const failing = drive(['RESET', 'FAILBROADCAST', 'PUSH']);
 const failure = JSON.parse(failing[0].json);
 check(failure.type === 'linescore:error' && typeof failure.message === 'string', 'a push failure broadcasts linescore:error', failing[0].json);
 check(failing[0].ok === false && failing[0].warns === 1 && failing[0].broadcasts === 1, 'a push failure logs once and returns false', JSON.stringify(failing[0]));

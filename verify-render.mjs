@@ -21,6 +21,7 @@ const CONTROL = `${BASE}/frames-shared/control.html?sbport=${WS_PORT}`;
 let passed = 0, failed = 0;
 const check = (n, ok, d) => { ok ? passed++ : failed++; console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${n}${!ok && d !== undefined ? ' — ' + d : ''}`); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const ARM_PAUSE = 700; // past the panel's minimum gap between arming a two-step button and confirming it
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 function startMock() {
@@ -59,6 +60,7 @@ async function verifyPanel(browser) {
   page.on('console', (m) => { if (m.type() === 'error' && !/WebSocket/.test(m.text())) errors.push(m.text()); });
   await page.goto(CONTROL, { waitUntil: 'load' });
   const input = (sel) => page.locator(sel).inputValue();
+  const clearMatch = async () => { await page.click('#new-match'); await sleep(ARM_PAUSE); await page.click('#new-match'); await sleep(250); };
   const synced = await page.waitForFunction(() => document.getElementById('t1name')?.value === 'Visitor', null, { timeout: 8000 }).then(() => true).catch(() => false);
   check('panel shows synced names', synced);
   check('panel says it is connected', /connected/.test(await page.locator('#status').textContent()));
@@ -80,9 +82,47 @@ async function verifyPanel(browser) {
   let s = await state();
   check('double-click awards once', s.teams[0].scores[1] === 10 && s.teams[0].scores[2] === null, JSON.stringify(s.teams[0].scores));
 
+  // A real double-click: the browser's own count, so it can't depend on timing
+  await clearMatch();
+  await page.click('[data-win="1"]');
+  await sleep(450);
+  await page.dblclick('[data-win="1"]');
+  await sleep(500);
+  s = await state();
+  check('a real double-click on a winner awards once', same(s.teams[0].scores, [10, 10, null]), JSON.stringify(s.teams[0].scores));
+  const win2 = await page.locator('[data-win="2"]').boundingBox();
+  await page.mouse.click(win2.x + 20, win2.y + 10);
+  await sleep(450);
+  await page.mouse.down({ clickCount: 2 }); // one press the browser counts as a double-click's second
+  await page.mouse.up({ clickCount: 2 });
+  await sleep(500);
+  s = await state();
+  check('a slow double-click, past the time window, still awards once', s.teams[1].scores[2] === 20 && s.columns.length === 4 && s.teams[1].scores[3] === null, JSON.stringify(s.teams[1].scores));
+  await page.dblclick('#undo');
+  await sleep(500);
+  s = await state();
+  check('a double-click on Undo takes back one result', s.teams[0].scores[1] === 10 && s.teams[1].scores[2] === null, JSON.stringify(s.teams));
+  const before2 = JSON.stringify((await state()).teams);
+  await page.dblclick('#new-match');
+  await sleep(300);
+  check('a double-click on New match clears nothing', JSON.stringify((await state()).teams) === before2);
+  await sleep(3200); // let it disarm
+  await page.dblclick('[data-preset="baseball"]');
+  await sleep(300);
+  check('a double-click on a preset changes nothing', (await state()).mode === 'fixed' && JSON.stringify((await state()).teams) === before2);
+  await sleep(3200);
+  await page.evaluate(() => { const b = document.getElementById('new-match'); b.click(); b.click(); });
+  await sleep(300);
+  check('two scripted clicks in a row clear nothing', JSON.stringify((await state()).teams) === before2);
+  await sleep(3200);
+  await clearMatch();
+  await page.click('#undo');
+  await sleep(300);
+  check('Undo brings a cleared match back', (await state()).teams[0].total > 0, JSON.stringify((await state()).teams));
+  await clearMatch();
+
   // Burst across buttons: lands in click order, nothing lost or merged
-  await page.click('#new-match'); await page.click('#new-match');
-  await sleep(250);
+  await clearMatch();
   check('New match clears for the burst', (await state()).teams[0].total === 0);
   await page.click('[data-win="1"]');
   await sleep(50);
@@ -94,8 +134,7 @@ async function verifyPanel(browser) {
   check('burst lands in click order', same(s.teams[0].scores, [10, 0, 20]) && same(s.teams[1].scores, [0, 10, 0]), JSON.stringify(s.teams));
 
   // A tie adds the extra column
-  await page.click('#new-match'); await page.click('#new-match');
-  await sleep(250);
+  await clearMatch();
   for (const b of ['1', '1', '2']) { await page.click(`[data-win="${b}"]`); await sleep(450); }
   check('tie adds an EXTRA cell', await page.locator('input[data-col="3"]').count() === 2);
   check('the winner buttons name the set in play', /EXTRA/.test(await page.locator('#award-hint').textContent()));
@@ -130,6 +169,38 @@ async function verifyPanel(browser) {
   await page.locator('#t1name').focus();
   await sleep(250);
 
+  // A half-typed cell or points box survives a broadcast that adds or removes a column
+  await clearMatch();
+  await mockCmd('t1win');
+  await mockCmd('t1win');
+  await page.locator('input[data-team="1"][data-col="0"]').selectText();
+  await page.keyboard.type('7');
+  let mark = (await log()).length;
+  await mockCmd('t2win');
+  s = await state();
+  check('a tie arrives while a cell is half-typed', s.columns.length === 4);
+  check('the half-typed cell keeps its text', await input('input[data-team="1"][data-col="0"]') === '7');
+  check('and keeps focus', await page.evaluate(() => document.activeElement?.dataset?.col === '0'));
+  check('and is not sent', (await log()).slice(mark).every((c) => c.command !== 't1') && s.teams[0].scores[0] === 10, JSON.stringify((await log()).slice(mark)));
+  await page.keyboard.press('Control+a');
+  await page.keyboard.type('10'); // back to its real value, so moving on commits nothing
+  await page.locator('input[data-team="1"][data-col="3"]').selectText();
+  await page.keyboard.type('9');
+  mark = (await log()).length;
+  await mockCmd('undo');
+  s = await state();
+  check('a half-typed cell in a column that goes away is not sent', s.columns.length === 3 && (await log()).slice(mark).every((c) => c.command !== 't1'), JSON.stringify((await log()).slice(mark)));
+  await page.locator('[data-worth="1"]').selectText();
+  await page.keyboard.type('33');
+  mark = (await log()).length;
+  await mockCmd('innings', '4');
+  check('a half-typed points box keeps its text across a new inning', await input('[data-worth="1"]') === '33');
+  check('and is not sent', (await log()).slice(mark).every((c) => c.command !== 'worth'), JSON.stringify((await log()).slice(mark)));
+  await page.locator('#t1name').focus();
+  await sleep(250);
+  await mockCmd('worth', '10 10 20 x5');
+  await clearMatch();
+
   // Batched set
   await page.locator('#t2name').fill('West');
   const before = (await log()).length;
@@ -140,11 +211,13 @@ async function verifyPanel(browser) {
   check('the names land', (await state()).teams[1].name === 'West');
 
   // Two-step clear
+  await mockCmd('t1win');
   const total = (await state()).teams[0].total;
   await page.click('#new-match');
   await sleep(150);
   check('first click clears nothing', total > 0 && (await state()).teams[0].total === total, `total ${total}`);
   check('first click asks for a second', /again/i.test(await page.locator('#new-match').textContent()));
+  await sleep(ARM_PAUSE);
   await page.click('#new-match');
   await sleep(250);
   check('second click clears', (await state()).teams[0].total === 0);
@@ -173,7 +246,7 @@ async function verifyPanel(browser) {
 
   // Labels
   await page.click('[data-preset="sfl"]');
-  await sleep(150);
+  await sleep(ARM_PAUSE);
   await page.click('[data-preset="sfl"]');
   await sleep(250);
   await page.click('[data-label-toggle="ball"]');
@@ -198,11 +271,25 @@ async function verifyPanel(browser) {
   check('and back', (await state()).hidden === false);
 
   // Connection state
+  await mockCmd('preset', 'sfl');
+  const beforeDrop = JSON.stringify((await state()).teams);
   await fetch(`${BASE}/mock/drop`);
   await sleep(200);
   check('a dropped connection shows', !/^connected/.test((await page.locator('#status').textContent()).trim()));
+  check('the buttons are disabled while it is down', await page.locator('[data-win="1"]').isDisabled() && await page.locator('#undo').isDisabled());
+  // Past the buttons, straight at the handlers: nothing may queue up for the reconnect
+  await page.evaluate(() => { for (const id of ['1', '2', '1']) { const b = document.querySelector('[data-win="' + id + '"]'); b.disabled = false; b.click(); b.disabled = true; } });
+  await page.locator('#t1name').fill('Typed in the outage');
+  await page.evaluate(() => { const b = document.querySelector('[data-set]'); b.disabled = false; b.click(); b.disabled = true; });
   await page.waitForFunction(() => /^connected/.test(document.getElementById('status').textContent.trim()), null, { timeout: 6000 }).catch(() => {});
+  await sleep(600);
   check('and it reconnects', /^connected/.test((await page.locator('#status').textContent()).trim()));
+  check('the buttons come back', !(await page.locator('[data-win="1"]').isDisabled()));
+  check('clicks made in the outage are not replayed', JSON.stringify((await state()).teams) === beforeDrop, JSON.stringify((await state()).teams));
+  check('a Set in the outage keeps the typed text', await input('#t1name') === 'Typed in the outage');
+  await page.locator('[data-set]').first().click();
+  await sleep(250);
+  check('and it lands on the next Set', (await state()).teams[0].name === 'Typed in the outage');
 
   await page.screenshot({ path: resolve(__dirname, 'control-render.png'), fullPage: true });
   check('no console errors', errors.length === 0, errors.join(' | '));
