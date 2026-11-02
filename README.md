@@ -18,7 +18,13 @@ It runs baseball-style scoring, where any team can score any number in any innin
 
 ## Quick start
 
-Get the code onto the machine that runs Streamer.bot. `<repo>` below means that folder.
+First, get the code onto the machine that runs Streamer.bot, either with
+
+```bash
+git clone https://github.com/FlashGalatine/frames-linescore.git
+```
+
+or with **<> Code → Download ZIP** on the repo page, extracted somewhere. `<repo>` below means that folder.
 
 1. **WebSocket Server:** Streamer.bot → *Servers/Clients → WebSocket Server*: enable, `127.0.0.1:8080`, authentication **off**. Frames doesn't speak Streamer.bot's authentication, like the other plugins in this family, so anything that can reach this port can run your actions. **Keep it bound to `127.0.0.1`**, never to a LAN address. (If the port is taken, run it elsewhere and add `?sbport=<port>` to every URL below.)
 2. **HTTP Server:** *Servers/Clients → HTTP Server*: enable, `127.0.0.1:7474`, and add two Path → Folder mappings:
